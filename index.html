@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Fracture — Start Menu</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  :root{
+    --accent: #00ffff;
+    --bg:#000010;
+    --panel: rgba(6,12,18,0.65);
+    --glass: rgba(255,255,255,0.04);
+    --glass-border: rgba(0,255,255,0.12);
+    --glass-strong: rgba(255,255,255,0.07);
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:'Press Start 2P',monospace;background:linear-gradient(180deg,var(--bg),#000);color:var(--accent);overflow:hidden}
+
+  /* background canvas */
+  #bgCanvas{position:fixed;inset:0;z-index:0;background:#000}
+
+  /* subtle overlay lines */
+  body::after{
+    content:"";pointer-events:none;position:fixed;inset:0;
+    background:repeating-linear-gradient(0deg, rgba(0,255,255,0.02) 0, rgba(0,255,255,0.02) 1px, transparent 2px);
+    z-index:1;mix-blend-mode:overlay;
+  }
+
+  /* layout center */
+  .stage{
+    position:relative;z-index:2;
+    width:100%;height:100%;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    gap:22px;padding:28px;
+  }
+
+  /* profile top-left */
+  .profile{
+    position:fixed;left:18px;top:18px;z-index:3;text-align:left;font-size:12px;line-height:1.1;color:rgba(0,255,255,0.95);
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    padding:10px;border-radius:8px;border:1px solid rgba(0,255,255,0.06);backdrop-filter: blur(4px);
+  }
+
+  .profile b{display:block;color:#fff;margin-bottom:6px;font-size:11px;font-weight:700}
+
+  /* Logo box */
+  .logo-wrap{
+    position:relative;width:760px;max-width:92%;display:flex;align-items:center;justify-content:center;
+    z-index:3;
+  }
+
+  .logo {
+    font-size:56px;
+    letter-spacing:6px;
+    color:var(--accent);
+    text-shadow:
+      0 0 6px rgba(0,255,255,0.25),
+      0 0 18px rgba(0,255,255,0.12),
+      0 4px 16px rgba(0,0,0,0.6);
+    position:relative;padding:22px 28px;border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.12));
+    border:1px solid var(--glass-border);
+    display:inline-block;
+    transform:translateY(-4px);
+    transition:transform .22s ease;
+  }
+  .logo:focus{outline:3px solid rgba(0,255,255,0.12);outline-offset:6px}
+
+  /* canvas overlay sits above the logo text */
+  #logoCanvas{position:absolute;left:0;top:0;pointer-events:none;z-index:4;border-radius:12px;mix-blend-mode:screen}
+
+  .controls{
+    display:flex;flex-direction:column;gap:14px;align-items:center;z-index:3;
+    width:100%;max-width:420px;
+  }
+
+  .btn{
+    width:100%;max-width:420px;padding:14px 20px;font-size:16px;color:#001;background:transparent;
+    background-image:linear-gradient(180deg, rgba(0,255,255,0.95), rgba(0,220,220,0.85));
+    border-radius:12px;border:none;cursor:pointer;box-shadow:0 8px 28px rgba(0,255,255,0.06), inset 0 -1px rgba(0,0,0,0.2);
+    transition:transform .14s ease, box-shadow .18s ease, filter .18s ease;
+    display:flex;align-items:center;gap:12px;justify-content:center;font-weight:700;
+  }
+  .btn.secondary{background:transparent;border:2px dashed rgba(0,255,255,0.12);color:var(--accent);font-weight:600}
+  .btn:hover{transform:translateY(-4px);filter:brightness(1.05)}
+  .btn:active{transform:translateY(-1px)}
+  .btn:focus{outline:4px solid rgba(0,255,255,0.08);outline-offset:6px}
+
+  footer{position:fixed;bottom:10px;font-size:10px;color:rgba(0,255,255,0.35);z-index:3}
+
+  /* sliding modal (from bottom) */
+  .slide-modal{
+    position:fixed;left:50%;transform:translateX(-50%) translateY(110%);bottom:0;
+    width:100%;max-width:520px;background:var(--panel);border-radius:14px 14px 6px 6px;padding:18px;
+    z-index:6;border:1px solid var(--glass-border);box-shadow:0 10px 40px rgba(0,0,0,0.6);
+    transition:transform .5s cubic-bezier(.16,.9,.28,1),opacity .35s ease;
+    opacity:0;
+    backface-visibility:hidden;
+  }
+  .slide-modal.open{transform:translateX(-50%) translateY(0);opacity:1}
+
+  .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .modal-head h3{margin:0;color:#fff;font-size:13px}
+  .modal-body{font-size:12px;color:var(--accent)}
+
+  .field{display:flex;flex-direction:column;margin:8px 0}
+  .field input,.field select{padding:8px;border-radius:8px;border:1px solid rgba(0,255,255,0.08);background:transparent;color:var(--accent);font-size:12px}
+
+  .row{display:flex;gap:8px;align-items:center}
+  .row .btn{flex:1}
+
+  /* spinner buffering */
+  .buffer-wrap{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:8}
+  .buffer-wrap.show{display:flex}
+  .buffer{
+    width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.2));
+    border:1px solid rgba(0,255,255,0.08);
+    box-shadow:0 8px 28px rgba(0,0,0,0.6);
+  }
+  .ring{
+    width:46px;height:46px;border-radius:50%;border:5px solid rgba(0,255,255,0.12);border-top-color:var(--accent);
+    animation:spin 1s linear infinite;
+  }
+
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* particle burst dot small */
+  .particle-dot{position:fixed;width:8px;height:8px;border-radius:50%;background:var(--accent);pointer-events:none;z-index:7;mix-blend-mode:screen;box-shadow:0 0 10px rgba(0,255,255,0.5)}
+
+  /* responsive tweaks */
+  @media (max-width:560px){
+    .logo{font-size:36px;padding:18px 18px}
+    .btn{font-size:14px;padding:12px}
+    .logo-wrap{width:92%}
+  }
+</style>
+</head>
+<body>
+
+<!-- Background canvas -->
+<canvas id="bgCanvas" aria-hidden="true"></canvas>
+
+<!-- profile -->
+<div class="profile" id="profileBox" aria-live="polite">
+  <b id="profileUser">Username: Guest</b>
+  <div id="profileMeta">Character: —  •  Level: 0</div>
+</div>
+
+<!-- stage -->
+<div class="stage" role="main" aria-label="Fracture Start Menu">
+  <div class="logo-wrap" aria-hidden="false">
+    <div class="logo" id="logoText" tabindex="0" aria-label="Fracture logo">FRACTURE</div>
+    <!-- canvas overlay for fracture & digital glitch -->
+    <canvas id="logoCanvas" aria-hidden="true"></canvas>
+  </div>
+
+  <div class="controls" role="group" aria-label="Main controls">
+    <button class="btn" id="startBtn"><i class="fa-solid fa-play"></i>&nbsp;Start</button>
+    <button class="btn secondary" id="onlineBtn"><i class="fa-solid fa-network-wired"></i>&nbsp;Play Online</button>
+    <button class="btn secondary" id="optionsBtn"><i class="fa-solid fa-cog"></i>&nbsp;Options</button>
+    <button class="btn secondary" id="customBtn"><i class="fa-solid fa-user-gear"></i>&nbsp;Customize</button>
+  </div>
+</div>
+
+<!-- sliding modals -->
+<div class="slide-modal" id="optionsModal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal-head"><h3>Options</h3><button class="btn secondary" id="closeOptions" aria-label="Close options">Close</button></div>
+  <div class="modal-body">
+    <div class="field"><label>Username</label><input id="usernameInput" type="text" placeholder="Enter username"></div>
+    <div class="field"><label>Theme</label>
+      <select id="themeSelect">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+    </div>
+    <div class="row"><button class="btn" id="saveOptions">Save</button><button class="btn secondary" id="resetBtn">Reset</button></div>
+  </div>
+</div>
+
+<div class="slide-modal" id="customModal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal-head"><h3>Character Creator</h3><button class="btn secondary" id="closeCustom" aria-label="Close customize">Close</button></div>
+  <div class="modal-body">
+    <div class="field"><label>Character Name</label><input id="charName" type="text" placeholder="Hero name"></div>
+    <div class="field"><label>Build</label>
+      <select id="charBuild"><option>Speed</option><option>Strength</option><option>Defense</option><option>Energy</option></select>
+    </div>
+    <div class="field"><label>Preview</label><div id="charPreview" style="height:80px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);display:flex;align-items:center;justify-content:center;color:var(--accent)">— animated preview —</div></div>
+    <div class="row"><button class="btn" id="saveChar">Save</button><button class="btn secondary" id="clearChar">Clear</button></div>
+  </div>
+</div>
+
+<!-- buffering circle -->
+<div class="buffer-wrap" id="bufferWrap" aria-hidden="true">
+  <div class="buffer" role="status" aria-live="polite" aria-label="Loading">
+    <div class="ring"></div>
+  </div>
+</div>
+
+<footer>v0.1.2 – Developed by Ruben • Designed by Theo</footer>
+
+<script>
+/* -------------- background star/shard canvas -------------- */
+const bg = document.getElementById('bgCanvas');
+const bgCtx = bg.getContext('2d');
+function resizeBg(){bg.width = innerWidth; bg.height = innerHeight}
+addEventListener('resize', resizeBg);
+resizeBg();
+
+let shards = [];
+function initShards(){
+  shards = [];
+  const count = Math.round(Math.max(60, innerWidth/12));
+  for(let i=0;i<count;i++){
+    shards.push({
+      x: Math.random()*bg.width,
+      y: Math.random()*bg.height,
+      vx: (Math.random()-0.5)*0.25,
+      vy: (Math.random()*0.4)+0.05,
+      rot: Math.random()*Math.PI*2,
+      rotSpeed:(Math.random()-0.5)*0.01,
+      w: (Math.random()*18)+4,
+      h: (Math.random()*4)+1,
+      alpha: Math.random()*0.6+0.15
+    });
+  }
+}
+initShards();
+addEventListener('resize', ()=>initShards());
+
+let mouse = {x:0,y:0};
+addEventListener('mousemove', e=>{mouse.x=e.clientX; mouse.y=e.clientY});
+
+function drawBg(){
+  bgCtx.clearRect(0,0,bg.width,bg.height);
+  // subtle gradient
+  const g = bgCtx.createLinearGradient(0,0,0,bg.height);
+  g.addColorStop(0,'#000011'); g.addColorStop(1,'#000006');
+  bgCtx.fillStyle = g;
+  bgCtx.fillRect(0,0,bg.width,bg.height);
+
+  // shards
+  shards.forEach(s=>{
+    s.x += s.vx + (mouse.x - s.x)*0.0006;
+    s.y += s.vy + (mouse.y - s.y)*0.0004;
+    s.rot += s.rotSpeed;
+    if(s.y > bg.height + 50) s.y = -50;
+    if(s.x > bg.width + 50) s.x = -50;
+    if(s.x < -50) s.x = bg.width + 50;
+    bgCtx.save();
+    bgCtx.translate(s.x, s.y);
+    bgCtx.rotate(s.rot);
+    bgCtx.globalAlpha = s.alpha;
+    bgCtx.fillStyle = '#00FFFF';
+    bgCtx.fillRect(-s.w/2, -s.h/2, s.w, s.h);
+    bgCtx.restore();
+  });
+
+  requestAnimationFrame(drawBg);
+}
+drawBg();
+
+/* ------------------ logo fracture canvas ------------------ */
+const logoCanvas = document.getElementById('logoCanvas');
+const logoText = document.getElementById('logoText');
+const logoPad = 18; // padding around text to draw on canvas
+
+function fitLogoCanvas(){
+  const r = logoText.getBoundingClientRect();
+  logoCanvas.width = Math.ceil(r.width + logoPad*2);
+  logoCanvas.height = Math.ceil(r.height + logoPad*2);
+  // place canvas aligned with logo
+  logoCanvas.style.left = (r.left - logoPad) + 'px';
+  logoCanvas.style.top = (r.top - logoPad) + 'px';
+  logoCanvas.style.width = logoCanvas.width+'px';
+  logoCanvas.style.height = logoCanvas.height+'px';
+}
+addEventListener('resize', fitLogoCanvas);
+fitLogoCanvas();
+
+const lctx = logoCanvas.getContext('2d');
+lctx.clearRect(0,0,logoCanvas.width,logoCanvas.height);
+
+/* fracture data */
+let cracks = [];
+let glitchSquares = [];
+const CRACK_COUNT = 8;
+const SQUARE_COUNT = 36;
+
+function resetFracture(){
+  cracks = [];
+  glitchSquares = [];
+  const W = logoCanvas.width, H = logoCanvas.height;
+  // define random crack lines (glass-shatter style)
+  for(let i=0;i<CRACK_COUNT;i++){
+    const x0 = Math.random()*W;
+    const y0 = Math.random()*H;
+    const segs = [];
+    let px = x0, py = y0;
+    const parts = Math.round(6 + Math.random()*8);
+    for(let s=0;s<parts;s++){
+      const nx = px + (Math.random()-0.5)*(W*0.22);
+      const ny = py + (Math.random()-0.5)*(H*0.22);
+      segs.push({x: nx, y: ny});
+      px = nx; py = ny;
+    }
+    cracks.push({start:{x:x0,y:y0}, segs, wobble: Math.random()*0.6 + 0.2, alpha:0});
+  }
+
+  // digital glitch squares
+  for(let i=0;i<SQUARE_COUNT;i++){
+    const size = 4 + Math.random()*18;
+    glitchSquares.push({
+      x: Math.random()*W,
+      y: Math.random()*H,
+      sx: size,
+      sy: size,
+      vx: (Math.random()-0.5)*1.4,
+      vy: (Math.random()-0.5)*1.4,
+      life: Math.random()*80+40,
+      phase: Math.random()*Math.PI*2,
+      flick: Math.random()*0.9+0.1
+    });
+  }
+}
+resetFracture();
+
+/* animation of fracture */
+let hoverIntensity = 0;
+let time = 0;
+function drawFracture(){
+  fitLogoCanvas();
+  const W = logoCanvas.width, H = logoCanvas.height;
+  lctx.clearRect(0,0,W,H);
+
+  // gentle glow under logo
+  lctx.save();
+  const glow = lctx.createLinearGradient(0,0,W,0);
+  glow.addColorStop(0,'rgba(0,255,255,0.04)');
+  glow.addColorStop(1,'rgba(0,255,255,0.02)');
+  lctx.fillStyle = glow;
+  lctx.fillRect(0,H-6,W,6);
+  lctx.restore();
+
+  // Glass cracks - lines
+  lctx.save();
+  lctx.lineWidth = 1.2;
+  cracks.forEach((c,ci)=>{
+    c.alpha += ( (hoverIntensity*0.9+0.12) - c.alpha ) * 0.06;
+    lctx.beginPath();
+    lctx.moveTo(c.start.x, c.start.y);
+    c.segs.forEach((s,i)=>{
+      // wiggle based on time and wobble
+      const wob = Math.sin(time*0.02 + i*1.3 + ci)*c.wobble*6;
+      lctx.lineTo(s.x + wob, s.y + wob*0.6);
+    });
+    lctx.strokeStyle = `rgba(180,255,255,${0.12 * c.alpha})`;
+    lctx.stroke();
+
+    // tiny branching
+    c.segs.forEach(s=>{
+      if(Math.random()<0.02){
+        lctx.beginPath();
+        lctx.moveTo(s.x, s.y);
+        lctx.lineTo(s.x + (Math.random()-0.5)*18, s.y + (Math.random()-0.5)*18);
+        lctx.strokeStyle = `rgba(200,255,255,${0.04 * c.alpha})`;
+        lctx.stroke();
+      }
+    });
+  });
+  lctx.restore();
+
+  // digital glitch squares (flicker & slight movement)
+  lctx.save();
+  glitchSquares.forEach((sq)=>{
+    sq.life -= 0.6 + Math.abs(Math.sin(time*0.05 + sq.phase))*0.4;
+    sq.x += sq.vx * (1 + hoverIntensity*1.6);
+    sq.y += sq.vy * (1 + hoverIntensity*1.6);
+    // wrap
+    if(sq.x < 0) sq.x = W;
+    if(sq.y < 0) sq.y = H;
+    if(sq.x > W) sq.x = 0;
+    if(sq.y > H) sq.y = 0;
+    // flicker alpha
+    const a = Math.max(0, Math.sin(time*0.12 + sq.phase) * 0.6 * sq.flick + 0.15 * hoverIntensity);
+    lctx.fillStyle = `rgba(0,255,255,${a})`;
+    lctx.fillRect(sq.x, sq.y, sq.sx, sq.sy);
+
+    // occasionally draw inverted pixel (glitch strip)
+    if(Math.random() < 0.01 + hoverIntensity*0.02){
+      lctx.fillStyle = `rgba(255,255,255,${0.05 + a*0.2})`;
+      lctx.fillRect(sq.x - 2, sq.y - 2, sq.sx + 4, Math.max(2,sq.sy/3));
+    }
+
+    if(sq.life < 0){
+      // respawn
+      sq.x = Math.random()*W; sq.y = Math.random()*H; sq.life = Math.random()*80+40;
+    }
+  });
+  lctx.restore();
+
+  // subtle vignette
+  lctx.save();
+  const grad = lctx.createRadialGradient(W/2,H/2,Math.min(W,H)/4,W/2,H/2,Math.max(W,H));
+  grad.addColorStop(0,'rgba(255,255,255,0)');
+  grad.addColorStop(1,'rgba(0,0,0,0.28)');
+  lctx.fillStyle = grad;
+  lctx.fillRect(0,0,W,H);
+  lctx.restore();
+
+  time++;
+  requestAnimationFrame(drawFracture);
+}
+drawFracture();
+
+/* increase intensity on hover/focus */
+logoText.addEventListener('mouseenter', ()=>{ hoverIntensity = 1; });
+logoText.addEventListener('mouseleave', ()=>{ hoverIntensity = 0; });
+logoText.addEventListener('focus', ()=>{ hoverIntensity = 1; });
+logoText.addEventListener('blur', ()=>{ hoverIntensity = 0; });
+
+/* ---------------- UI & interactions ---------------- */
+const startBtn = document.getElementById('startBtn');
+const onlineBtn = document.getElementById('onlineBtn');
+const optionsBtn = document.getElementById('optionsBtn');
+const customBtn = document.getElementById('customBtn');
+
+const optionsModal = document.getElementById('optionsModal');
+const customModal = document.getElementById('customModal');
+
+const closeOptions = document.getElementById('closeOptions');
+const closeCustom = document.getElementById('closeCustom');
+
+const bufferWrap = document.getElementById('bufferWrap');
+
+const usernameInput = document.getElementById('usernameInput');
+const themeSelect = document.getElementById('themeSelect');
+const saveOptions = document.getElementById('saveOptions');
+const resetBtn = document.getElementById('resetBtn');
+
+const charName = document.getElementById('charName');
+const charBuild = document.getElementById('charBuild');
+const saveChar = document.getElementById('saveChar');
+const clearChar = document.getElementById('clearChar');
+
+function openModal(modal){
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden','false');
+  // slide from bottom: adjust transform was handled by CSS .open
+}
+function closeModal(modal){
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden','true');
+}
+
+/* open/close handlers */
+optionsBtn.addEventListener('click', ()=>{ openModal(optionsModal); loadOptions(); });
+closeOptions.addEventListener('click', ()=> closeModal(optionsModal));
+customBtn.addEventListener('click', ()=>{ openModal(customModal); loadCharacter(); });
+closeCustom.addEventListener('click', ()=> closeModal(customModal));
+
+/* keyboard accessibility */
+addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape'){
+    closeModal(optionsModal);
+    closeModal(customModal);
+  }
+});
+
+/* load/save localStorage */
+function loadProfile(){
+  const user = localStorage.getItem('fracture_username') || 'Guest';
+  const cname = localStorage.getItem('fracture_charname') || '—';
+  const cbuild = localStorage.getItem('fracture_charbuild') || '—';
+  document.getElementById('profileUser').textContent = `Username: ${user}`;
+  document.getElementById('profileMeta').textContent = `Character: ${cname} • Build: ${cbuild}`;
+}
+function loadOptions(){
+  usernameInput.value = localStorage.getItem('fracture_username') || '';
+  themeSelect.value = localStorage.getItem('fracture_theme') || 'dark';
+}
+function saveOptionsHandler(){
+  const u = usernameInput.value.trim();
+  if(u) localStorage.setItem('fracture_username', u);
+  localStorage.setItem('fracture_theme', themeSelect.value);
+  applyTheme(themeSelect.value);
+  loadProfile();
+  closeModal(optionsModal);
+}
+saveOptions.addEventListener('click', saveOptionsHandler);
+resetBtn.addEventListener('click', ()=>{
+  localStorage.removeItem('fracture_username');
+  localStorage.removeItem('fracture_charname');
+  localStorage.removeItem('fracture_charbuild');
+  localStorage.removeItem('fracture_theme');
+  usernameInput.value=''; charName.value=''; charBuild.value='Speed';
+  applyTheme('dark');
+  loadProfile();
+  alert('Profile reset.');
+});
+
+/* character save */
+function loadCharacter(){
+  charName.value = localStorage.getItem('fracture_charname') || '';
+  charBuild.value = localStorage.getItem('fracture_charbuild') || 'Speed';
+  // simple animated preview effect - update text
+  document.getElementById('charPreview').textContent = `${charName.value || '—'} (${charBuild.value})`;
+}
+saveChar.addEventListener('click', ()=>{
+  const name = charName.value.trim() || 'Hero';
+  const build = charBuild.value;
+  localStorage.setItem('fracture_charname', name);
+  localStorage.setItem('fracture_charbuild', build);
+  loadProfile();
+  closeModal(customModal);
+  alert(`Character saved: ${name} (${build})`);
+});
+clearChar.addEventListener('click', ()=>{
+  localStorage.removeItem('fracture_charname');
+  localStorage.removeItem('fracture_charbuild');
+  charName.value=''; charBuild.value='Speed';
+  document.getElementById('charPreview').textContent = '— animated preview —';
+});
+
+/* theme apply */
+function applyTheme(t){
+  if(t === 'light'){
+    document.documentElement.style.setProperty('--accent','#0a0a0a');
+    document.documentElement.style.setProperty('--bg','#f6f8f9');
+    document.documentElement.style.setProperty('--panel','rgba(255,255,255,0.9)');
+  } else {
+    document.documentElement.style.setProperty('--accent','#00ffff');
+    document.documentElement.style.setProperty('--bg','#000010');
+    document.documentElement.style.setProperty('--panel','rgba(6,12,18,0.65)');
+  }
+}
+applyTheme(localStorage.getItem('fracture_theme') || 'dark');
+
+/* start button: particle burst + buffer spinner */
+function createParticle(x,y){
+  const el = document.createElement('div');
+  el.className = 'particle-dot';
+  el.style.left = x - 4 + 'px';
+  el.style.top = y - 4 + 'px';
+  document.body.appendChild(el);
+  return el;
+}
+function particleBurst(x,y,count=34){
+  const parts = [];
+  for(let i=0;i<count;i++){
+    const p = createParticle(x,y);
+    const ang = Math.random()*Math.PI*2;
+    const speed = 2 + Math.random()*8;
+    const vx = Math.cos(ang)*speed;
+    const vy = Math.sin(ang)*speed;
+    let life = 40 + Math.random()*36;
+    const rot = (Math.random()-0.5)*360;
+    parts.push({el:p,vx,vy,life,rot});
+  }
+  // animate frame
+  const t = setInterval(()=>{
+    for(let i=parts.length-1;i>=0;i--){
+      const o = parts[i];
+      const left = parseFloat(o.el.style.left);
+      const top = parseFloat(o.el.style.top);
+      o.el.style.left = (left + o.vx) + 'px';
+      o.el.style.top = (top + o.vy) + 'px';
+      o.vy += 0.25; // gravity
+      o.life--;
+      o.el.style.opacity = Math.max(0, o.life/70);
+      o.el.style.transform = `rotate(${o.rot}deg)`;
+      o.rot += 6;
+      if(o.life <= 0){
+        o.el.remove();
+        parts.splice(i,1);
+      }
+    }
+    if(parts.length===0) clearInterval(t);
+  },16);
+}
+
+startBtn.addEventListener('click', (ev)=>{
+  const rect = ev.currentTarget.getBoundingClientRect();
+  const x = rect.left + rect.width/2;
+  const y = rect.top + rect.height/2;
+  particleBurst(x,y,36);
+  bufferWrap.classList.add('show');
+  // simulate buffer then redirect / load game
+  setTimeout(()=>{
+    bufferWrap.classList.remove('show');
+    // TODO: replace with: window.location.href = 'game.html';
+    alert('Buffer complete — replace with game.html');
+  }, 900 + Math.random()*800);
+});
+
+/* online placeholder */
+onlineBtn.addEventListener('click', ()=>{
+  particleBurst(window.innerWidth/2, window.innerHeight/2, 12);
+  setTimeout(()=> alert('Online matchmaking coming soon!'), 260);
+});
+
+/* initial load */
+loadProfile();
+
+/* focus + keyboard for buttons (enter triggers) */
+[...document.querySelectorAll('.btn')].forEach(b=>{
+  b.addEventListener('keydown', e=>{
+    if(e.key === 'Enter') b.click();
+  });
+});
+
+/* ensure logo canvas keeps updated when text resizes/changes */
+const observer = new ResizeObserver(()=>{ fitLogoCanvas(); resetFracture(); });
+observer.observe(logoText);
+
+/* small accessibility: announce changes (aria-live) when saving */
+function announce(msg){
+  const a = document.createElement('div');
+  a.style.position='fixed';a.style.left='-9999px';a.setAttribute('aria-live','polite');a.textContent=msg;
+  document.body.appendChild(a);
+  setTimeout(()=>a.remove(),1200);
+}
+
+/* show hover flash on logo when clicking it */
+logoText.addEventListener('click', ()=>{
+  hoverIntensity = 1;
+  setTimeout(()=> hoverIntensity = 0, 600);
+  // small particle burst near logo
+  const lr = logoText.getBoundingClientRect();
+  particleBurst(lr.left + lr.width/2, lr.top + lr.height/2, 18);
+});
+
+/* small improvements: ensure logo canvas on top of logo */
+logoCanvas.style.pointerEvents = 'none';
+logoCanvas.style.zIndex = 4;
+
+/* final: politely handle saves via buttons */
+document.getElementById('saveOptions').addEventListener('click', saveOptionsHandler);
+
+/* ensure inputs update preview */
+charName.addEventListener('input', ()=> { document.getElementById('charPreview').textContent = `${charName.value || '—'} (${charBuild.value})`});
+charBuild.addEventListener('change', ()=> { document.getElementById('charPreview').textContent = `${charName.value || '—'} (${charBuild.value})`});
+
+</script>
+</body>
+</html>
