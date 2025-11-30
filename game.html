@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fracture – Arena</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: #02040a;
+        font-family: Arial, sans-serif;
+    }
+
+    #gameCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+
+    /* HUD */
+    .hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        width: 250px;
+        color: white;
+        user-select: none;
+        font-size: 14px;
+    }
+
+    .bar {
+        width: 200px;
+        height: 20px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 4px;
+        margin-bottom: 10px;
+        overflow: hidden;
+    }
+
+    .barFill {
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, #00ffee, #0099ff);
+        transition: width 0.2s ease;
+    }
+
+    /* XP bar bottom */
+    #xpBarContainer {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40%;
+        background: rgba(255,255,255,0.2);
+        height: 10px;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    #xpBar {
+        height: 100%;
+        width: 0%;
+        background: #00ffee;
+        transition: width 0.3s;
+    }
+
+    /* Particles background */
+    #particleCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: -1;
+    }
+</style>
+</head>
+
+<body>
+
+<canvas id="particleCanvas"></canvas>
+<canvas id="gameCanvas"></canvas>
+
+<div class="hud">
+    <div>HEALTH</div>
+    <div class="bar"><div id="hpFill" class="barFill"></div></div>
+
+    <div>ENERGY</div>
+    <div class="bar"><div id="energyFill" class="barFill"></div></div>
+</div>
+
+<div id="xpBarContainer">
+    <div id="xpBar"></div>
+</div>
+
+<script>
+/* -----------------------------------------------------------
+   BASIC GAME ENGINE – FRACTURE ARENA (2.5D / FP Hybrid)
+------------------------------------------------------------ */
+const gameCanvas = document.getElementById("gameCanvas");
+const ctx = gameCanvas.getContext("2d");
+
+gameCanvas.width = innerWidth;
+gameCanvas.height = innerHeight;
+
+const keys = {};
+let lastTime = 0;
+
+/* Player */
+const player = {
+    x: 400,
+    y: 200,
+    z: 0,
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    speed: 4,
+    sprintSpeed: 6,
+    jumpForce: 13,
+    gravity: 0.7,
+    onGround: false,
+    jumps: 0,
+    maxJumps: 2,
+    dashCooldown: 0,
+
+    hp: 100,
+    energy: 100,
+    xp: 0,
+    xpMax: 100
+};
+
+/* Flat map + platforms */
+const platforms = [
+    { x: 0, y: 600, width: 2000, height: 40 },
+    { x: 300, y: 450, width: 200, height: 20 },
+    { x: 700, y: 350, width: 250, height: 20 },
+    { x: 1100, y: 500, width: 300, height: 20 }
+];
+
+/* ---------------------------
+   INPUT
+---------------------------- */
+document.addEventListener("keydown", e => {
+    keys[e.key] = true;
+
+    if (e.key === " " && player.jumps < player.maxJumps) {
+        player.vy = -player.jumpForce;
+        player.jumps++;
+    }
+
+    if (e.key === "q" && player.dashCooldown <= 0) {
+        dash();
+    }
+});
+
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+/* ---------------------------
+   DASH ABILITY
+---------------------------- */
+function dash() {
+    let dir = 0;
+
+    if (keys["a"]) dir = -1;
+    else if (keys["d"]) dir = 1;
+
+    if (dir !== 0) player.vx = dir * 20;
+
+    player.dashCooldown = 60; // 1 second at 60fps
+}
+
+/* ---------------------------
+   PHYSICS
+---------------------------- */
+function physics() {
+    const moveSpeed = keys["Shift"] ? player.sprintSpeed : player.speed;
+
+    if (keys["a"]) player.vx = -moveSpeed;
+    else if (keys["d"]) player.vx = moveSpeed;
+    else player.vx *= 0.9;
+
+    player.vy += player.gravity;
+
+    player.x += player.vx;
+    player.y += player.vy;
+
+    /* Collisions */
+    let grounded = false;
+
+    for (const p of platforms) {
+        if (
+            player.x > p.x &&
+            player.x < p.x + p.width &&
+            player.y + 40 > p.y &&
+            player.y + 40 < p.y + p.height + 40 &&
+            player.vy > 0
+        ) {
+            player.y = p.y - 40;
+            player.vy = 0;
+            grounded = true;
+        }
+    }
+
+    if (grounded) {
+        player.onGround = true;
+        player.jumps = 0;
+    } else {
+        player.onGround = false;
+    }
+
+    if (player.dashCooldown > 0) player.dashCooldown--;
+}
+
+/* ---------------------------
+   DRAW
+---------------------------- */
+function draw() {
+    ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+    /* Draw platforms */
+    ctx.fillStyle = "#0af2ff33";
+    for (const p of platforms) {
+        ctx.fillRect(p.x - player.x + innerWidth / 2, p.y, p.width, p.height);
+    }
+
+    /* Player (simple rectangle placeholder) */
+    ctx.fillStyle = "#00ffee";
+    ctx.fillRect(innerWidth / 2 - 15, player.y - 40, 30, 40);
+}
+
+/* ---------------------------
+   HUD UPDATE
+---------------------------- */
+function updateHUD() {
+    document.getElementById("hpFill").style.width = player.hp + "%";
+    document.getElementById("energyFill").style.width = player.energy + "%";
+    document.getElementById("xpBar").style.width = (player.xp / player.xpMax) * 100 + "%";
+}
+
+/* ---------------------------
+   MAIN LOOP
+---------------------------- */
+function loop(time) {
+    const delta = time - lastTime;
+    lastTime = time;
+
+    physics();
+    draw();
+    updateHUD();
+
+    requestAnimationFrame(loop);
+}
+loop(0);
+
+/* -----------------------------------------------------------
+   BACKGROUND PARTICLES
+------------------------------------------------------------ */
+const pCanvas = document.getElementById("particleCanvas");
+const pCtx = pCanvas.getContext("2d");
+
+pCanvas.width = innerWidth;
+pCanvas.height = innerHeight;
+
+const particles = [];
+
+for (let i = 0; i < 120; i++) {
+    particles.push({
+        x: Math.random() * innerWidth,
+        y: Math.random() * innerHeight,
+        size: Math.random() * 2 + 1,
+        speed: Math.random() * 0.6 + 0.2
+    });
+}
+
+function particleLoop() {
+    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+
+    pCtx.fillStyle = "#00ffee55";
+
+    for (let p of particles) {
+        pCtx.beginPath();
+        pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        pCtx.fill();
+
+        p.y -= p.speed;
+        if (p.y < 0) p.y = innerHeight;
+    }
+
+    requestAnimationFrame(particleLoop);
+}
+particleLoop();
+</script>
+
+</body>
+</html>
