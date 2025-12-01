@@ -13,6 +13,55 @@
                 display: block;
             }
 
+            /* Multiplayer Connect Overlay */
+            #multiplayerConnect {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 400px;
+                background: rgba(10, 20, 30, 0.98);
+                border: 2px solid #00ffaa;
+                color: white;
+                padding: 20px;
+                font-family: Arial;
+                text-align: center;
+                z-index: 100;
+                box-shadow: 0 0 30px rgba(0, 255, 170, 0.5);
+            }
+            #multiplayerConnect h2 {
+                color: #00ffaa;
+                margin-top: 0;
+            }
+            #multiplayerConnect input, #multiplayerConnect button {
+                padding: 10px;
+                margin: 5px;
+                font-size: 16px;
+                border-radius: 4px;
+                border: none;
+            }
+            #multiplayerConnect input {
+                width: 60%;
+                background: #333;
+                color: white;
+            }
+            #multiplayerConnect button {
+                background: #00ffaa;
+                color: #111;
+                cursor: pointer;
+                font-weight: bold;
+            }
+            #peerIdDisplay {
+                color: #ffaa00;
+                font-weight: bold;
+                font-size: 1.1em;
+                word-break: break-all;
+            }
+            #connectionStatus {
+                margin-top: 10px;
+                color: #ff5555;
+            }
+            
             /* Main HUD Bar (Health, Energy, XP) */
             #mainHud {
                 position: fixed;
@@ -189,6 +238,7 @@
                 display: none; /* Hidden by default */
                 z-index: 50;
                 box-shadow: 0 0 20px #0ff8;
+                text-align: center; /* Center buttons/text */
             }
             #statsMenu h2 {
                 color: #0ff;
@@ -199,6 +249,7 @@
                 justify-content: space-between;
                 padding: 5px 0;
                 border-bottom: 1px dashed #333;
+                text-align: left; /* Align stats left */
             }
             .statButton {
                 background: #0ff;
@@ -213,10 +264,40 @@
                 color: #f0f;
                 font-weight: bold;
             }
+
+            /* Return Button Style */
+            #returnButton {
+                background: #f33; /* Red color for exit */
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                cursor: pointer;
+                font-weight: bold;
+                border-radius: 4px;
+                margin-top: 20px;
+                box-shadow: 0 0 8px rgba(255, 51, 51, 0.5);
+                transition: background-color 0.1s;
+            }
+            #returnButton:hover {
+                background: #ff5555;
+            }
         </style>
+        <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     </head>
     <body>
         <canvas id="gameCanvas"></canvas>
+        
+        <div id="multiplayerConnect">
+            <h2>Multiplayer Connection</h2>
+            <p>Share this ID with a friend:</p>
+            <p id="peerIdDisplay">...Initializing...</p>
+            <p>Enter the other player's ID to connect:</p>
+            <input type="text" id="targetId" placeholder="Other Player ID">
+            <button onclick="connectToPeer()">Connect</button>
+            <p id="connectionStatus">Status: Disconnected</p>
+            <p style="font-size: 12px; margin-top: 15px; color: #999;">NOTE: Game state (HP, XP, Stats) is not fully synchronized in this simple implementation, only position/movement are shown.</p>
+        </div>
+        
         <div id="mainHud">
             <div id="levelDisplay">Lvl: 1</div>
             <div class="statBarContainer">
@@ -243,7 +324,7 @@
         </div>
 
         <div id="abilityBar">
-            <div id="abilityTitle">Universal: <span id="uniAbilityName">Punch</span> (LMB) </div>
+            <div id="abilityTitle">Universal: <span id="uniAbilityName">Punch</span> (LMB) / **DASH (Q)** / **BLOCK (F)**</div>
             <div class="abilitySlot" id="slot1">
                 <div class="cooldownOverlay" id="cool1"></div>
                 <div class="abilityKey">1</div>
@@ -262,7 +343,7 @@
             <div class="abilitySlot" id="slot4">
                 <div class="cooldownOverlay" id="cool4"></div>
                 <div class="abilityKey">4</div>
-                <div class="abilityName" id="name4">Punch</div> 
+                <div class="abilityName" id="name4">Dash/Punch</div> 
             </div>
         </div>
         
@@ -289,10 +370,132 @@
                 <span>Energy: <span id="menuEng">100</span></span>
                 <button class="statButton" onclick="distributeStat('energy')">+</button>
             </div>
+            
+            <button id="returnButton" onclick="returnToMenu()">Return to Main Menu</button>
+            
             <p style="margin-top: 15px; color: #aaa;">Press 'C' to Close.</p>
         </div>
 
         <script>
+            // ===== MULTIPLAYER SETUP =====
+            const multiplayerConnectDiv = document.getElementById('multiplayerConnect');
+            const peerIdDisplay = document.getElementById('peerIdDisplay');
+            const connectionStatus = document.getElementById('connectionStatus');
+            
+            let peer = null;
+            let connections = {}; // Stores DataConnection objects
+            let remotePlayers = {}; // Stores remote player data {peerId: {x, y, ...}}
+
+            function initMultiplayer() {
+                // Generate a unique ID (optional, PeerJS can generate one)
+                const myId = 'fracture_' + Math.random().toString(16).slice(2);
+                
+                // Use a default PeerJS cloud server for signaling
+                peer = new Peer(myId, {
+                    host: 'peerjs-server-fra.herokuapp.com', // A known public PeerJS server
+                    port: 443,
+                    secure: true
+                });
+
+                peer.on('open', (id) => {
+                    peerIdDisplay.innerText = id;
+                    connectionStatus.innerText = 'Status: Ready to Connect';
+                });
+
+                peer.on('connection', (conn) => {
+                    handleConnection(conn);
+                });
+
+                peer.on('error', (err) => {
+                    console.error("PeerJS Error:", err);
+                    connectionStatus.innerText = `Error: ${err.type}`;
+                });
+            }
+
+            function connectToPeer() {
+                const targetId = document.getElementById('targetId').value.trim();
+                if (!targetId || targetId === peer.id) {
+                    alert('Please enter a valid, different Peer ID.');
+                    return;
+                }
+                
+                connectionStatus.innerText = `Status: Connecting to ${targetId}...`;
+                const conn = peer.connect(targetId);
+                handleConnection(conn);
+            }
+
+            function handleConnection(conn) {
+                conn.on('open', () => {
+                    connections[conn.peer] = conn;
+                    remotePlayers[conn.peer] = {x: 0, y: 0, w: 40, h: 60, facing: 1, hp: 100, maxHp: 100, build: savedBuild};
+                    connectionStatus.innerText = `Status: Connected to ${conn.peer}`;
+                    multiplayerConnectDiv.style.display = 'none'; // Hide connection UI
+                    
+                    // Send initial data to the new peer
+                    sendData(conn.peer, true);
+                    
+                    // Start sending position data regularly
+                    if (!playerDataInterval) {
+                        playerDataInterval = setInterval(sendLocalPlayerData, 1000 / 30); // 30 times per second
+                    }
+                });
+
+                conn.on('data', (data) => {
+                    if (data.type === 'STATE') {
+                        remotePlayers[conn.peer].x = data.x;
+                        remotePlayers[conn.peer].y = data.y;
+                        remotePlayers[conn.peer].facing = data.facing;
+                        remotePlayers[conn.peer].hp = data.hp;
+                        remotePlayers[conn.peer].maxHp = data.maxHp;
+                        // For a real game, you'd also want to synchronize combat, abilities, etc.
+                    } else if (data.type === 'INITIAL') {
+                         remotePlayers[conn.peer].build = data.build;
+                    }
+                });
+
+                conn.on('close', () => {
+                    delete connections[conn.peer];
+                    delete remotePlayers[conn.peer];
+                    connectionStatus.innerText = `Status: Disconnected from ${conn.peer}`;
+                    if (Object.keys(connections).length === 0) {
+                        clearInterval(playerDataInterval);
+                        playerDataInterval = null;
+                        multiplayerConnectDiv.style.display = 'block'; // Show connection UI if last peer disconnects
+                    }
+                });
+                
+                conn.on('error', (err) => {
+                    console.error(`Connection Error with ${conn.peer}:`, err);
+                });
+            }
+
+            let playerDataInterval = null;
+
+            function sendData(targetPeerId, isInitial = false) {
+                const data = {
+                    type: isInitial ? 'INITIAL' : 'STATE',
+                    x: player.x,
+                    y: player.y,
+                    facing: player.facing,
+                    hp: player.hp,
+                    maxHp: player.maxHp,
+                    build: savedBuild // Only needed for initial sync
+                };
+                
+                if (targetPeerId && connections[targetPeerId]) {
+                    connections[targetPeerId].send(data);
+                } else {
+                    for (let peerId in connections) {
+                        connections[peerId].send(data);
+                    }
+                }
+            }
+
+            function sendLocalPlayerData() {
+                sendData(null); // Send to all connected peers
+            }
+            // ===== END MULTIPLAYER SETUP =====
+
             // ===== CANVAS & CONTEXT SETUP =====
             const canvas = document.getElementById("gameCanvas");
             const ctx = canvas.getContext("2d");
@@ -356,10 +559,10 @@
             const savedBuild = localStorage.getItem('fracture_charbuild') || 'Strength';
             
             const buildStats = {
-                'Strength': { str: 18, spd: 3, def: 0, maxHp: 100, abilityNames: ["Ground Smash", "Punch Combo", "Berserk Mode", "Punch"] },
-                'Speed': { str: 7, spd: 8, def: 0, maxHp: 100, abilityNames: ["Dash Burst", "Double Jump", "Blur (Invinc)", "Punch"] },
-                'Defense': { str: 10, spd: 4, def: 5, maxHp: 140, reflectDamage: 0.3, abilityNames: ["Shield Wall", "Armor Boost", "Thorns (Reflect)", "Punch"] },
-                'Energy': { str: 10, spd: 4, def: 0, maxHp: 100, energy: 150, abilityNames: ["Fireball", "Energy Beam", "Teleport", "Punch"] }
+                'Strength': { str: 18, spd: 3, def: 0, maxHp: 100, color: "#ff8800", abilityNames: ["Ground Smash", "Punch Combo", "Berserk Mode", "Punch"] },
+                'Speed': { str: 7, spd: 8, def: 0, maxHp: 100, color: "#00ffcc", abilityNames: ["Dash Burst", "Double Jump", "Blur (Invinc)", "Punch"] },
+                'Defense': { str: 10, spd: 4, def: 5, maxHp: 140, color: "#4444ff", reflectDamage: 0.3, abilityNames: ["Shield Wall", "Armor Boost", "Thorns (Reflect)", "Punch"] },
+                'Energy': { str: 10, spd: 4, def: 0, maxHp: 100, energy: 150, color: "#ff00ff", abilityNames: ["Fireball", "Energy Beam", "Teleport", "Punch"] }
             };
 
             // Apply build stats
@@ -373,6 +576,7 @@
             player.stats.energy = b.energy || 100;
             player.energy = player.stats.energy;
             player.xpToNextLevel = getXPForLevel(player.level);
+            player.color = b.color; // Set local player color
 
             // Update UI names
             document.getElementById("name1").innerText = b.abilityNames[0];
@@ -430,6 +634,11 @@
             let abilityCooldowns = [0, 0, 0, 0];
             let screenShakeTime = 0;
             let shakeIntensity = 0;
+
+            // FUNCTION: Return to Menu
+            function returnToMenu() {
+                window.location.href = 'index.html';
+            }
 
             function triggerScreenShake(duration = 8, intensity = 4) {
                 screenShakeTime = duration;
@@ -525,7 +734,7 @@
                 });
             }
 
-            // ===== COMBAT HELPERS (Unchanged) =====
+            // ===== COMBAT HELPERS (Mostly Unchanged) =====
             function rectCollide(a, b) {
                 return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + a.h && a.y + a.h > b.y;
             }
@@ -632,7 +841,21 @@
             // Simulation of NPC attacking every 2 seconds (Unchanged)
             setInterval(() => {
                 if (npc.alive && !menuOpen) {
+                    // Check collision with any player (local or remote)
+                    const ground = canvas.height - 80;
+                    const npcBox = getNPCBox();
+                    
+                    let targetPlayer = null;
+                    
+                    // Check local player
+                    let playerBox = {x: player.x, y: ground - player.h, w: player.w, h: player.h};
                     if (Math.abs(player.x - npc.x) < 100) {
+                         targetPlayer = player;
+                    }
+                    
+                    // Note: In a real game, damage needs to be server-controlled, not client-side.
+                    // For now, only the local player takes damage.
+                    if (targetPlayer === player && Math.abs(player.x - npc.x) < 100) {
                         dealDamageToPlayer(15);
                     }
                 }
@@ -876,8 +1099,11 @@
                 combatMetrics.dps = recentDamage / 3.0;
             }
 
-            // ===== UPDATE LOOP =====
+            // ===== UPDATE LOOP (Unchanged) =====
             function update() {
+                // Only update the game if the connection menu is closed
+                if (multiplayerConnectDiv.style.display === 'block') return;
+
                 if (menuOpen) return;
 
                 // Player Movement, Physics, etc.
@@ -1092,8 +1318,79 @@
                 }
             }
 
-            // ===== DRAW LOOP (Modified for Block visual) =====
+            // ===== DRAW LOOP (Modified to draw remote players) =====
             const vfxQueue = []; 
+
+            function drawPlayer(p, isLocal) {
+                const ground = canvas.height - 80;
+                ctx.save();
+                ctx.translate(-camX, 0);
+
+                // Player Body
+                let color = p.color || (isLocal ? buildStats[savedBuild].color : buildStats[p.build || 'Strength'].color);
+                
+                if (isLocal) {
+                    ctx.fillStyle = color;
+                    if (p.invincible) {
+                        ctx.fillStyle = "#00ffff";
+                        ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.3;
+                    } else if (p.berserkMode) {
+                        ctx.fillStyle = "#ff5555";
+                    } else if (p.isBlocking) {
+                        ctx.fillStyle = "#aaa";
+                    } else if (p.isDashing) {
+                        ctx.fillStyle = "#4aff00";
+                    }
+                } else {
+                    // Remote player visual is slightly different
+                    ctx.fillStyle = color;
+                    ctx.globalAlpha = 0.9;
+                }
+
+                ctx.fillRect(p.x, p.y, p.w, p.h);
+                ctx.globalAlpha = 1;
+
+                // HP Bar (Above player)
+                const hpRatio = p.hp / p.maxHp;
+                const hpBarWidth = p.w * 1.5;
+                const hpBarX = p.x - (hpBarWidth - p.w) / 2;
+                const hpBarY = p.y - 15;
+                
+                ctx.fillStyle = "#222";
+                ctx.fillRect(hpBarX, hpBarY, hpBarWidth, 5);
+                ctx.fillStyle = isLocal ? "#f33" : "#00ffaa"; // Local is red, remote is green/cyan
+                ctx.fillRect(hpBarX, hpBarY, hpBarWidth * hpRatio, 5);
+                
+                // Name/ID Label
+                ctx.font = "bold 10px Arial";
+                ctx.textAlign = "center";
+                ctx.fillStyle = isLocal ? "#fff" : "#00ffaa";
+                ctx.fillText(isLocal ? savedBuild : p.build || 'Remote', p.x + p.w / 2, p.y - 20);
+
+                // BLOCK SHIELD EFFECT
+                if (p.isBlocking && isLocal) { 
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 3;
+                    ctx.globalAlpha = 0.8;
+                    ctx.beginPath();
+                    if (p.facing === 1) {
+                         ctx.arc(p.x + p.w, p.y + p.h / 2, 25, Math.PI / 2, -Math.PI / 2);
+                    } else {
+                         ctx.arc(p.x, p.y + p.h / 2, 25, -Math.PI / 2, Math.PI / 2);
+                    }
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+                
+                // ATTACK HITBOX (Only draw for local player)
+                if (isLocal && p.attackTime > 0) {
+                    let hitbox = getAttackBox();
+                    ctx.fillStyle = "rgba(255,255,255,0.3)";
+                    ctx.fillRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
+                }
+
+                ctx.restore();
+            }
 
             function draw() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1109,12 +1406,13 @@
                 ctx.translate(shakeOffsetX, shakeOffsetY);
                 // --------------------------------
 
+                // GROUND (Drawn relative to canvas/viewport, not camX)
+                ctx.fillStyle = "#222";
+                ctx.fillRect(0, canvas.height - 80, canvas.width, 80);
+                
+                // Draw ground background (must translate back to world space)
                 ctx.translate(-camX, 0);
 
-                // GROUND
-                ctx.fillStyle = "#222";
-                ctx.fillRect(camX, canvas.height - 80, canvas.width * 2, 80);
-                
                 // AFTERIMAGES
                 for (let img of afterimages) {
                     ctx.fillStyle = img.color;
@@ -1123,7 +1421,6 @@
                 }
                 ctx.globalAlpha = 1;
 
-
                 // NPC
                 if (npc.alive) {
                     let npcBox = getNPCBox();
@@ -1131,44 +1428,14 @@
                     ctx.fillRect(npcBox.x, npcBox.y, npcBox.w, npcBox.h);
                 }
 
-                // PLAYER
-                ctx.fillStyle = "#4af";
-                if (player.invincible) {
-                    ctx.fillStyle = "#00ffff";
-                    ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.3;
-                } else if (player.berserkMode) {
-                    ctx.fillStyle = "#ff5555";
-                } else if (player.isBlocking) { // Blocking Visual
-                    ctx.fillStyle = "#aaa";
-                } else if (player.isDashing) { // Dashing Visual
-                    ctx.fillStyle = "#4aff00";
+                // DRAW REMOTE PLAYERS
+                for (let peerId in remotePlayers) {
+                    drawPlayer(remotePlayers[peerId], false);
                 }
-                ctx.fillRect(player.x, player.y, player.w, player.h);
-                ctx.globalAlpha = 1;
-
-                // BLOCK SHIELD EFFECT
-                if (player.isBlocking) {
-                    ctx.strokeStyle = "#ffffff";
-                    ctx.lineWidth = 3;
-                    ctx.globalAlpha = 0.8;
-                    ctx.beginPath();
-                    // Draw a half-circle shield in the direction the player is facing
-                    if (player.facing === 1) {
-                         ctx.arc(player.x + player.w, player.y + player.h / 2, 25, Math.PI / 2, -Math.PI / 2);
-                    } else {
-                         ctx.arc(player.x, player.y + player.h / 2, 25, -Math.PI / 2, Math.PI / 2);
-                    }
-                    ctx.stroke();
-                    ctx.globalAlpha = 1;
-                }
-
-
-                // ATTACK HITBOX
-                if (player.attackTime > 0) {
-                    let hitbox = getAttackBox();
-                    ctx.fillStyle = "rgba(255,255,255,0.3)";
-                    ctx.fillRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
-                }
+                
+                // DRAW LOCAL PLAYER
+                drawPlayer(player, true);
+                
 
                 // PARTICLES
                 for (let p of particles) {
@@ -1215,12 +1482,15 @@
                 ctx.restore();
             }
 
-            // ===== GAME LOOP (Unchanged) =====
+            // ===== GAME LOOP (Start multiplayer init first) =====
             function loop() {
                 update();
                 draw();
                 requestAnimationFrame(loop);
             }
+            
+            // Start the game loop and multiplayer
+            initMultiplayer();
             loop();
         </script>
     </body>
