@@ -303,10 +303,6 @@
             const player = {
                 x: 0,
                 y: 0,
-                // --- ADDED FOR MULTIPLAYER ---
-                id: 1, // Unique ID for this client player
-                name: savedBuild + " Build",
-                // -----------------------------
                 w: 40,
                 h: 60,
                 velX: 0,
@@ -350,16 +346,6 @@
                 dps: 0
             };
             const COMBO_RESET_TIME = 90; // 1.5 seconds at 60 FPS
-            
-            // NEW: Multiplayer State Object & Simulation Config
-            const otherPlayers = [
-                { id: 2, x: 200, y: 0, w: 40, h: 60, hp: 100, maxHp: 100, facing: -1, isDashing: false, isBlocking: false, name: "Ally 1 (Def)", color: "#00aaff" },
-                { id: 3, x: 600, y: 0, w: 40, h: 60, hp: 100, maxHp: 100, facing: 1, isDashing: false, isBlocking: false, name: "Ally 2 (Str)", color: "#ff66aa" }
-            ];
-            // Simulation: Server tick rate for updates (e.g., 60ms)
-            const SERVER_TICK_RATE = 60;
-            let lastServerTick = Date.now();
-            // End NEW
 
             // Leveling curve (Example: Linear increase)
             function getXPForLevel(level) {
@@ -658,44 +644,6 @@
 
             }, 2000);
 
-            // Simulation of a Server Tick (runs every SERVER_TICK_RATE ms)
-            function simulateServerTick() {
-                const ground = canvas.height - 80;
-                
-                // 1. Update our client's state to all other players (Simulated)
-                const thisPlayerState = {
-                    id: player.id,
-                    x: player.x,
-                    y: player.y,
-                    hp: player.hp,
-                    maxHp: player.maxHp,
-                    facing: player.facing,
-                    isDashing: player.isDashing,
-                    isBlocking: player.isBlocking,
-                    name: player.name,
-                    color: player.berserkMode ? "#ff5555" : (player.invincible ? "#00ffff" : "#4af")
-                };
-                // In a real game, this would send `thisPlayerState` to a server.
-                
-                // 2. Simulate movement for other players
-                otherPlayers.forEach(p => {
-                    // Simple random movement logic for the simulation
-                    if (Math.random() < 0.02) p.facing *= -1; // Random direction change
-                    
-                    let moveSpeed = 2;
-                    p.x += p.facing * moveSpeed;
-
-                    // Keep them on the ground
-                    if (p.y + p.h > ground) p.y = ground - p.h;
-
-                    // Simple HP regeneration simulation
-                    p.hp = Math.min(p.maxHp, p.hp + 0.1);
-
-                    // Simple Attack/Block/Dash simulation (randomly turn on/off)
-                    if (Math.random() < 0.005) p.isBlocking = !p.isBlocking;
-                    if (Math.random() < 0.005) p.isDashing = !p.isDashing;
-                });
-            }
 
             // ===================== UNIVERSAL & BUILD ABILITIES (Unchanged) =====================
             function universalPunch() {
@@ -1198,46 +1146,7 @@
                 ctx.fillRect(player.x, player.y, player.w, player.h);
                 ctx.globalAlpha = 1;
 
-                // NEW: DRAW OTHER PLAYERS
-                for (let otherP of otherPlayers) {
-                    // Body
-                    ctx.fillStyle = otherP.color;
-                    ctx.fillRect(otherP.x, otherP.y, otherP.w, otherP.h);
-
-                    // Name Tag
-                    ctx.font = "bold 12px Arial";
-                    ctx.textAlign = "center";
-                    ctx.fillStyle = "#ffffff";
-                    ctx.fillText(otherP.name, otherP.x + otherP.w / 2, otherP.y - 15);
-                    
-                    // HP Bar
-                    const hpRatio = otherP.hp / otherP.maxHp;
-                    ctx.fillStyle = "#f33";
-                    ctx.fillRect(otherP.x, otherP.y - 10, otherP.w * hpRatio, 5);
-                    ctx.strokeStyle = "#555";
-                    ctx.strokeRect(otherP.x, otherP.y - 10, otherP.w, 5);
-                    
-                    // Blocking/Dashing VFX for other players
-                    if (otherP.isBlocking) {
-                        ctx.strokeStyle = "#ffffff";
-                        ctx.lineWidth = 3;
-                        ctx.globalAlpha = 0.8;
-                        ctx.beginPath();
-                        if (otherP.facing === 1) {
-                             ctx.arc(otherP.x + otherP.w, otherP.y + otherP.h / 2, 25, Math.PI / 2, -Math.PI / 2);
-                        } else {
-                             ctx.arc(otherP.x, otherP.y + otherP.h / 2, 25, -Math.PI / 2, Math.PI / 2);
-                        }
-                        ctx.stroke();
-                        ctx.globalAlpha = 1;
-                    } else if (otherP.isDashing) {
-                        ctx.fillStyle = otherP.color + "77"; // semi-transparent color
-                        ctx.fillRect(otherP.x, otherP.y, otherP.w, otherP.h);
-                    }
-                }
-                // END NEW: DRAW OTHER PLAYERS
-
-                // BLOCK SHIELD EFFECT (Original Client Player Logic)
+                // BLOCK SHIELD EFFECT
                 if (player.isBlocking) {
                     ctx.strokeStyle = "#ffffff";
                     ctx.lineWidth = 3;
@@ -1306,17 +1215,10 @@
                 ctx.restore();
             }
 
-            // ===== GAME LOOP (Modified) =====
+            // ===== GAME LOOP (Unchanged) =====
             function loop() {
                 update();
                 draw();
-                
-                // NEW: Server Tick Simulation
-                if (Date.now() - lastServerTick > SERVER_TICK_RATE) {
-                    simulateServerTick();
-                    lastServerTick = Date.now();
-                }
-
                 requestAnimationFrame(loop);
             }
             loop();
