@@ -13,18 +13,7 @@
                 display: block;
             }
 
-            #ui {
-                position: fixed;
-                top: 10px;
-                left: 10px;
-                color: #0ff;
-                font-family: Arial;
-                font-size: 16px;
-                text-shadow: 0 0 6px #0ff;
-                z-index: 10;
-            }
-
-            /* Main HUD Bar (Health, Energy, XP) */
+            /* Main HUD Bar (Health, Energy, XP) - Unchanged */
             #mainHud {
                 position: fixed;
                 top: 10px;
@@ -76,6 +65,37 @@
                 text-shadow: 0 0 5px #0ff;
             }
 
+            /* NEW: DPS Meter & Combo Counter Container */
+            #combatInfo {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                z-index: 10;
+                color: #fff;
+                font-family: Arial;
+                text-shadow: 1px 1px 2px #000;
+            }
+
+            #dpsMeter {
+                font-size: 18px;
+                font-weight: bold;
+                color: #f00; /* Red for damage */
+                text-shadow: 0 0 8px #f008;
+                margin-bottom: 5px;
+            }
+
+            #comboCounter {
+                font-size: 24px;
+                font-weight: bold;
+                color: #ffaa00; /* Gold/Orange for combo */
+                text-shadow: 0 0 10px #ffaa00;
+                transition: transform 0.1s ease-out;
+            }
+            
+            /* NPC HP Bar - Unchanged */
             #npcHpBar {
                 position: fixed;
                 top: 10px;
@@ -93,7 +113,7 @@
                 background: #f33;
             }
 
-            /* Ability Bar (Unchanged) */
+            /* Ability Bar - Unchanged */
             #abilityBar {
                 position: fixed;
                 bottom: 10px;
@@ -154,7 +174,7 @@
                 border-radius: 4px;
             }
             
-            /* Stats Menu Overlay */
+            /* Stats Menu Overlay - Unchanged */
             #statsMenu {
                 position: fixed;
                 top: 50%;
@@ -211,6 +231,11 @@
                 <div class="statBarInner" id="xpBarInner"></div>
                 <div class="statBarLabel" id="xpLabel">XP: 0 / 100 (Level 1)</div>
             </div>
+        </div>
+
+        <div id="combatInfo">
+            <div id="dpsMeter">DPS: 0.0</div>
+            <div id="comboCounter"></div>
         </div>
         
         <div id="npcHpBar">
@@ -295,8 +320,8 @@
                 maxHp: 100,
                 level: 1,
                 xp: 0,
-                xpToNextLevel: 100, // Starting XP required
-                unspentStatPoints: 0, // NEW: For leveling up
+                xpToNextLevel: 100, 
+                unspentStatPoints: 0, 
                 invincible: false,
                 berserkMode: false,
                 stats: {
@@ -307,14 +332,25 @@
                     reflectDamage: 0
                 }
             };
-            
+
+            // ===== COMBAT METRICS (NEW) =====
+            const combatMetrics = {
+                totalDamage: 0,
+                damageLog: [], // Stores { time: Date.now(), damage: amount }
+                comboCount: 0,
+                comboTimer: 0, // Frames until combo resets (e.g., 60 frames = 1 second)
+                maxCombo: 0,
+                dps: 0
+            };
+            const COMBO_RESET_TIME = 90; // 1.5 seconds at 60 FPS
+
             // Leveling curve (Example: Linear increase)
             function getXPForLevel(level) {
-                return 100 + (level - 1) * 50; // 100, 150, 200, 250, etc.
+                return 100 + (level - 1) * 50; 
             }
 
             // ===== CHARACTER CREATOR/BUILD SELECTION (Simulated) =====
-            const savedBuild = localStorage.getItem('fracture_charbuild') || 'Strength'; // Changed default to Strength for variety
+            const savedBuild = localStorage.getItem('fracture_charbuild') || 'Strength';
             
             const buildStats = {
                 'Strength': { str: 18, spd: 3, def: 0, maxHp: 100, abilityNames: ["Ground Smash", "Punch Combo", "Berserk Mode", "Punch"] },
@@ -351,7 +387,7 @@
                 hp: 300,
                 maxHp: 300,
                 alive: true,
-                xpValue: 50 // NEW: XP reward
+                xpValue: 50 
             };
 
             // ===== INPUT & VFX ARRAYS =====
@@ -362,17 +398,18 @@
             canvas.addEventListener("mousedown", () => mouseDown = true);
             canvas.addEventListener("mouseup", () => mouseDown = false);
 
-            let menuOpen = false; // NEW: State for the stats menu
+            let menuOpen = false;
             document.addEventListener("keydown", (e) => {
                 if (e.key.toLowerCase() === "c") {
                     menuOpen = !menuOpen;
                     document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
-                    if (menuOpen) updateStatsMenu(); // Refresh menu when opened
+                    if (menuOpen) updateStatsMenu(); 
                 }
             });
 
             const damageNumbers = [];
             const particles = [];
+            const afterimages = []; // NEW: Afterimages array
             let camX = 0;
             let abilityCooldowns = [0, 0, 0, 0];
             let screenShakeTime = 0;
@@ -383,9 +420,9 @@
                 shakeIntensity = intensity;
             }
 
-            // ===== NEW: XP & LEVEL UP LOGIC =====
+            // ===== NEW: XP & LEVEL UP LOGIC (Unchanged) =====
             function gainXP(amount) {
-                if (!player.alive) return; // Stop gaining XP if dead (hypothetical)
+                if (!player.alive) return;
                 player.xp += amount;
                 createDamageNumber(amount + " XP", player.x + player.w / 2, player.y - 20, "#00ff00");
                 
@@ -398,7 +435,7 @@
                 player.xp -= player.xpToNextLevel;
                 player.level++;
                 player.xpToNextLevel = getXPForLevel(player.level);
-                player.unspentStatPoints += 3; // +3 stat points per level
+                player.unspentStatPoints += 3;
 
                 // Full heal upon level up
                 player.hp = player.maxHp;
@@ -409,11 +446,10 @@
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#f0f", 50, 15);
                 createDamageNumber("LEVEL UP!", player.x + player.w / 2, player.y - 40, "#f0f");
 
-                // Check for ability unlocks (Conceptual)
                 if (player.level === 3) console.log("Ability Upgrade Unlocked!");
             }
 
-            // NEW: Stat Distribution Logic
+            // NEW: Stat Distribution Logic (Unchanged)
             function distributeStat(stat) {
                 if (player.unspentStatPoints <= 0) return;
                 player.unspentStatPoints--;
@@ -430,7 +466,7 @@
                 updateStatsMenu();
             }
 
-            // ===== VFX HELPERS (UNMODIFIED) =====
+            // ===== VFX HELPERS (ADDED Afterimages) =====
             function createDamageNumber(amount, x, y, color = "#ffffff") {
                 damageNumbers.push({
                     text: Math.ceil(amount).toString(),
@@ -467,9 +503,17 @@
                 }
             }
 
-            // ===== COMBAT HELPERS (MODIFIED to include XP gain) =====
+            function createAfterimage(x, y, w, h, color) {
+                afterimages.push({
+                    x, y, w, h,
+                    life: 15,
+                    color
+                });
+            }
+
+            // ===== COMBAT HELPERS (MODIFIED for Combo/DPS) =====
             function rectCollide(a, b) {
-                return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+                return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + a.h && a.y + a.h > b.y;
             }
 
             function getNPCBox() {
@@ -514,6 +558,18 @@
 
                     npc.hp -= finalDmg;
 
+                    // --- COMBAT METRICS UPDATE ---
+                    combatMetrics.totalDamage += finalDmg;
+                    combatMetrics.damageLog.push({ time: Date.now(), damage: finalDmg });
+                    combatMetrics.comboCount++;
+                    combatMetrics.comboTimer = COMBO_RESET_TIME;
+                    combatMetrics.maxCombo = Math.max(combatMetrics.maxCombo, combatMetrics.comboCount);
+
+                    document.getElementById('comboCounter').style.transform = 'scale(1.2)'; // Combo shake VFX
+                    setTimeout(() => {
+                        document.getElementById('comboCounter').style.transform = 'scale(1.0)';
+                    }, 50);
+
                     // --- SCREEN SHAKE ---
                     if (isAbility) {
                         triggerScreenShake(12, 6);
@@ -528,22 +584,23 @@
                     
                     if (npc.hp <= 0 && npc.alive) {
                         npc.alive = false;
-                        gainXP(npc.xpValue); // Grant XP on kill
+                        gainXP(npc.xpValue);
+                        combatMetrics.comboCount = 0; // Reset combo on kill
                     }
                 }
             }
             
-            // NPC Basic Attack (Conceptual for Defense Build reflection)
+            // NPC Basic Attack (Conceptual for Defense Build reflection) - Unchanged
             function dealDamageToPlayer(amount) {
                 if (player.invincible) return;
 
                 let incomingDmg = amount - player.stats.defense;
-                if (incomingDmg < 1) incomingDmg = 1; // Minimum damage
+                if (incomingDmg < 1) incomingDmg = 1;
 
                 // Defense Build - Reflect Logic
                 if (player.stats.reflectDamage > 0) {
                     let reflectedDmg = incomingDmg * player.stats.reflectDamage;
-                    dealDamageToNPC(reflectedDmg, true); // Reflect damage back to NPC
+                    dealDamageToNPC(reflectedDmg, true); 
                     createDamageNumber(reflectedDmg + " Reflect", npc.x + npc.w / 2, npc.y - 10, "#00ff00");
                 }
 
@@ -551,15 +608,13 @@
                 if (player.hp < 0) player.hp = 0;
             }
             
-            // Simulation of NPC attacking every 2 seconds
+            // Simulation of NPC attacking every 2 seconds - Unchanged
             setInterval(() => {
                 if (npc.alive && !menuOpen) {
-                    // Basic attack simulation
                     if (Math.abs(player.x - npc.x) < 100) {
                         dealDamageToPlayer(15);
                     }
                 }
-                // Respawn NPC if dead for testing
                 if (!npc.alive) {
                     npc.hp = npc.maxHp;
                     npc.alive = true;
@@ -569,24 +624,34 @@
             }, 2000);
 
 
-            // ===================== UNIVERSAL & BUILD ABILITIES (Energy cost added) =====================
+            // ===================== UNIVERSAL & BUILD ABILITIES (VFX Added) =====================
             function universalPunch() {
                 if (player.attackCooldown <= 0) {
                     player.attackTime = 10;
                     player.attackCooldown = 20;
                     let damage = player.stats.strength + (Math.random() * 4);
                     dealDamageToNPC(damage, false);
+                    // VFX: Flash Shake (small)
+                    triggerScreenShake(3, 1);
                 }
             }
 
-            // --- SPEED BUILD ABILITIES --- (Cost added)
-            function speed_ability1() {
+            // --- SPEED BUILD ABILITIES --- (VFX ADDED)
+            function speed_ability1() { // Dash Burst
                 if (abilityCooldowns[0] > 0 || player.stamina < 30) return;
                 player.stamina -= 30;
                 abilityCooldowns[0] = 70;
                 player.dashTime = 15;
                 player.velX = player.facing * 18;
                 burstParticles(player.x, player.y + player.h / 2, "#4aff00", 20, 5);
+                // VFX: Afterimages
+                const interval = setInterval(() => {
+                    if (player.dashTime > 0) {
+                        createAfterimage(player.x, player.y, player.w, player.h, "#00ff0055");
+                    } else {
+                        clearInterval(interval);
+                    }
+                }, 40);
                 setTimeout(() => {
                     let dmg = player.stats.speed * 2.5;
                     dealDamageToNPC(dmg, true);
@@ -594,7 +659,7 @@
                 }, 200);
             }
 
-            function speed_ability2() {
+            function speed_ability2() { // Double Jump
                 if (abilityCooldowns[1] > 0) return;
                 abilityCooldowns[1] = 90;
                 player.jumpCount = 0;
@@ -602,111 +667,135 @@
                 spawnParticle(player.x + 20, player.y + player.h, "#0ff");
             }
 
-            function speed_ability3() {
+            function speed_ability3() { // Blur (Invinc)
                 if (abilityCooldowns[2] > 0 || player.energy < 20) return;
                 player.energy -= 20;
                 abilityCooldowns[2] = 180;
                 player.invincible = true;
+                // VFX: Screen distortion (simulated by large screen shake) & Color bursts
+                triggerScreenShake(10, 8);
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 30, 10);
                 setTimeout(() => {
                     player.invincible = false;
                 }, 1000);
             }
 
-            // --- STRENGTH BUILD ABILITIES --- (Energy cost added)
-            function strength_ability1() {
+            // --- STRENGTH BUILD ABILITIES --- (VFX ADDED)
+            function strength_ability1() { // Ground Smash
                 if (abilityCooldowns[0] > 0 || player.energy < 30) return;
                 player.energy -= 30;
                 abilityCooldowns[0] = 90;
                 let dmg = player.stats.strength * 2.5;
                 dealDamageToNPC(dmg, true);
                 burstParticles(player.x + player.w / 2, canvas.height - 80, "#ff0000", 30, 8);
+                // VFX: Shockwave circle
+                vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: canvas.height - 80, color: "#ff5500", life: 30, radius: 10, maxRadius: 500 });
                 triggerScreenShake(15, 8);
             }
 
-            function strength_ability2() {
+            function strength_ability2() { // Punch Combo
                 if (abilityCooldowns[1] > 0 || player.stamina < 40) return;
                 player.stamina -= 40;
                 abilityCooldowns[1] = 60;
                 let hits = 4;
                 let dmgPerHit = player.stats.strength * 0.7;
+                // VFX: Energy trails (small afterimages for each punch)
                 for (let i = 0; i < hits; i++) {
                     setTimeout(() => {
                         dealDamageToNPC(dmgPerHit, true);
+                        createAfterimage(player.x + player.w, player.y, 10, player.h, "#ff880055");
                     }, i * 100);
                 }
             }
 
-            function strength_ability3() {
+            function strength_ability3() { // Berserk Mode
                 if (abilityCooldowns[2] > 0 || player.energy < 50) return;
                 player.energy -= 50;
                 abilityCooldowns[2] = 240;
                 player.berserkMode = true;
                 player.stats.defense = -5;
+                // VFX: Color bursts & Screen distortion
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff5555", 50, 15);
+                triggerScreenShake(20, 10);
                 setTimeout(() => {
                     player.berserkMode = false;
                     player.stats.defense = buildStats[savedBuild].def;
+                    // VFX: Color bursts (exit)
+                    burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#55ff55", 30, 8);
                 }, 4000);
             }
 
-            // --- DEFENSE BUILD ABILITIES --- (Cost added)
-            function defense_ability1() {
+            // --- DEFENSE BUILD ABILITIES --- (Unchanged, primarily status effects)
+            function defense_ability1() { // Shield Wall
                 if (abilityCooldowns[0] > 0 || player.energy < 15) return;
                 player.energy -= 15;
                 abilityCooldowns[0] = 120;
                 player.stats.defense += 10;
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#0000ff", 20, 5);
                 setTimeout(() => {
                     player.stats.defense -= 10;
                 }, 2000);
             }
 
-            function defense_ability2() {
+            function defense_ability2() { // Armor Boost (Heal)
                 if (abilityCooldowns[1] > 0 || player.energy < 20) return;
                 player.energy -= 20;
                 abilityCooldowns[1] = 180;
                 let heal = player.maxHp * 0.15;
                 player.hp = Math.min(player.maxHp, player.hp + heal);
+                // VFX: Color bursts (green for heal)
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ff00", 25, 6);
+                createDamageNumber(heal.toFixed(0) + " Heal", player.x + player.w / 2, player.y - 20, "#00ff00");
             }
 
-            function defense_ability3() {
+            function defense_ability3() { // Thorns (Reflect)
                 if (abilityCooldowns[2] > 0 || player.energy < 10) return;
                 player.energy -= 10;
                 abilityCooldowns[2] = 180;
                 player.stats.reflectDamage = 0.5;
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#8888ff", 15, 3);
                 setTimeout(() => {
                     player.stats.reflectDamage = 0.3;
                 }, 3000);
             }
 
-            // --- ENERGY BUILD ABILITIES --- (Energy cost already implemented)
-            function energy_ability1() {
+            // --- ENERGY BUILD ABILITIES --- (VFX ADDED)
+            function energy_ability1() { // Fireball
                 if (abilityCooldowns[0] > 0 || player.energy < 25) return;
                 player.energy -= 25;
                 abilityCooldowns[0] = 90;
                 let dmg = player.stats.energy * 0.8;
                 dealDamageToNPC(dmg, true);
+                // VFX: Energy trails
+                vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: npc.x, targetY: npc.y, color: "#ff6600", life: 20 });
                 burstParticles(npc.x, npc.y + npc.h / 2, "#ff6600", 25, 6);
             }
 
-            function energy_ability2() {
+            function energy_ability2() { // Energy Beam
                 if (abilityCooldowns[1] > 0 || player.energy < 40) return;
                 player.energy -= 40;
                 abilityCooldowns[1] = 150;
                 let dmg = player.stats.energy * 1.5;
                 dealDamageToNPC(dmg, true);
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 40, 10);
+                // VFX: Flash Shake & Screen Distortion
                 triggerScreenShake(15, 7);
             }
 
-            function energy_ability3() {
+            function energy_ability3() { // Teleport
                 if (abilityCooldowns[2] > 0 || player.energy < 15) return;
                 player.energy -= 15;
                 abilityCooldowns[2] = 60;
+                // VFX: Afterimages (before)
+                createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99");
                 burstParticles(player.x, player.y + player.h / 2, "#8800ff", 15, 3);
                 player.x += player.facing * 150;
+                // VFX: Afterimages (after)
+                createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99");
                 burstParticles(player.x, player.y + player.h / 2, "#8800ff", 15, 3);
             }
 
-            // ===================== ABILITY HANDLER & INPUT =====================
+            // ===================== ABILITY HANDLER & INPUT (Unchanged) =====================
             function ability1() {
                 if (menuOpen) return;
                 if (savedBuild === 'Speed') speed_ability1();
@@ -742,23 +831,41 @@
                     if (abilityCooldowns[i] > 0) abilityCooldowns[i]--;
                 }
             }
+            
+            // ===== NEW: DPS & Combo Update Logic =====
+            function updateCombatMetrics() {
+                // Combo Timer
+                if (combatMetrics.comboTimer > 0) {
+                    combatMetrics.comboTimer--;
+                } else if (combatMetrics.comboCount > 0) {
+                    combatMetrics.comboCount = 0;
+                }
+
+                // DPS Calculation (Damage in the last 3 seconds)
+                const threeSecondsAgo = Date.now() - 3000;
+                combatMetrics.damageLog = combatMetrics.damageLog.filter(entry => entry.time > threeSecondsAgo);
+                
+                const recentDamage = combatMetrics.damageLog.reduce((sum, entry) => sum + entry.damage, 0);
+                
+                // Calculate DPS: (Recent Damage / 3 seconds)
+                combatMetrics.dps = recentDamage / 3.0;
+            }
 
             // ===== UPDATE LOOP =====
             function update() {
-                if (menuOpen) return; // Pause game logic when menu is open
+                if (menuOpen) return;
 
-                // Player Movement, Physics, etc.
+                // Player Movement, Physics, etc. (Unchanged)
                 player.velY += 0.8;
                 if (keys["a"]) player.facing = -1;
                 if (keys["d"]) player.facing = 1;
                 let moveSpeed = keys["shift"] && player.stamina > 0 ? player.stats.speed * 1.7 : player.stats.speed;
                 
-                // Stamina management
+                // Stamina & Energy management (Unchanged)
                 if (keys["shift"] && player.stamina > 0) player.stamina -= 0.5;
                 else player.stamina += 0.4;
                 player.stamina = Math.max(0, Math.min(100, player.stamina));
 
-                // Energy regeneration (Simple implementation)
                 player.energy += 0.5;
                 player.energy = Math.min(player.stats.energy, player.energy);
 
@@ -782,7 +889,7 @@
                 if (player.attackTime > 0) player.attackTime--;
                 if (player.attackCooldown > 0) player.attackCooldown--;
 
-                // POSITION
+                // POSITION (Unchanged)
                 player.x += player.velX;
                 player.y += player.velY;
                 const ground = canvas.height - 80;
@@ -809,47 +916,54 @@
                     d.life--;
                     if (d.life <= 0) damageNumbers.splice(i, 1);
                 }
+                for (let i = afterimages.length - 1; i >= 0; i--) { // NEW: Afterimage update
+                    afterimages[i].life--;
+                    if (afterimages[i].life <= 0) afterimages.splice(i, 1);
+                }
+                for (let i = vfxQueue.length - 1; i >= 0; i--) { // NEW: VFX Queue update
+                    vfxQueue[i].life--;
+                    if (vfxQueue[i].life <= 0) vfxQueue.splice(i, 1);
+                }
+
 
                 updateAbilityCooldowns();
+                updateCombatMetrics(); // NEW: Update DPS and Combo
 
-                // CAMERA & SCREEN SHAKE UPDATE
+                // CAMERA & SCREEN SHAKE UPDATE (Unchanged)
                 if (screenShakeTime > 0) {
                     screenShakeTime--;
                 }
                 camX += ((player.x - canvas.width / 2) - camX) * 0.08;
 
-                // UI UPDATES (New and Consolidated)
+                // UI UPDATES
                 updateMainHUD();
                 updateCooldownUI();
+                updateCombatUI(); // NEW: Update Combo/DPS HUD
             }
 
-            // ===== UI / HUD Features (New Functions) =====
+            // ===== UI / HUD Features =====
             
-            // 6.1 Main HUD: Health, Energy, XP, Level progress
+            // Main HUD: Health, Energy, XP, Level progress (Unchanged)
             function updateMainHUD() {
-                // HP Bar
                 const hpRatio = player.hp / player.maxHp;
                 document.getElementById("hpBarInner").style.width = (hpRatio * 100) + "%";
                 document.getElementById("hpLabel").innerText = `HP: ${parseInt(player.hp)} / ${player.maxHp}`;
                 
-                // Energy Bar
                 const energyRatio = player.energy / player.stats.energy;
                 document.getElementById("energyBarInner").style.width = (energyRatio * 100) + "%";
                 document.getElementById("energyLabel").innerText = `Energy: ${parseInt(player.energy)} / ${player.stats.energy}`;
 
-                // XP Bar
                 const xpRatio = player.xp / player.xpToNextLevel;
                 document.getElementById("xpBarInner").style.width = (xpRatio * 100) + "%";
                 document.getElementById("xpLabel").innerText = `XP: ${parseInt(player.xp)} / ${player.xpToNextLevel}`;
                 document.getElementById("levelDisplay").innerText = `Lvl: ${player.level}`;
                 
-                // NPC HP
                 if (npc.alive) {
                     document.getElementById("npcHpBarInner").style.width = (npc.hp / npc.maxHp * 100) + "%";
                 }
             }
 
-            // 6.1 Cooldowns (skill timers)
+            // Cooldowns (skill timers) (Unchanged)
             function updateCooldownUI() {
                 const maxCooldowns = [70, 90, 180, 0];
                 for (let i = 0; i < 4; i++) {
@@ -861,7 +975,7 @@
                 }
             }
             
-            // Upgrade / Skill Menu (Stats)
+            // Upgrade / Skill Menu (Stats) (Unchanged)
             function updateStatsMenu() {
                 document.getElementById('statPoints').innerText = player.unspentStatPoints;
                 document.getElementById('menuStr').innerText = player.stats.strength;
@@ -870,15 +984,29 @@
                 document.getElementById('menuHp').innerText = player.maxHp;
                 document.getElementById('menuEng').innerText = player.stats.energy;
 
-                // Hide/Show '+' button if no points are available
                 const buttons = document.querySelectorAll('#statsMenu .statButton');
                 buttons.forEach(btn => {
                     btn.style.display = player.unspentStatPoints > 0 ? 'inline-block' : 'none';
                 });
             }
 
+            // NEW: Combat Metrics UI (Combo/DPS)
+            function updateCombatUI() {
+                document.getElementById('dpsMeter').innerText = `DPS: ${combatMetrics.dps.toFixed(1)}`;
 
-            // ===== DRAW LOOP =====
+                const comboDisplay = document.getElementById('comboCounter');
+                if (combatMetrics.comboCount > 1) {
+                    comboDisplay.innerText = `${combatMetrics.comboCount}x COMBO`;
+                    comboDisplay.style.opacity = 1;
+                } else {
+                    comboDisplay.innerText = '';
+                    comboDisplay.style.opacity = 0;
+                }
+            }
+
+            // ===== DRAW LOOP (Modified for Afterimages and VFX) =====
+            const vfxQueue = []; // NEW: For drawing complex VFX like shockwaves
+
             function draw() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.save();
@@ -895,11 +1023,20 @@
 
                 ctx.translate(-camX, 0);
 
-                // GROUND
+                // GROUND (Unchanged)
                 ctx.fillStyle = "#222";
                 ctx.fillRect(camX, canvas.height - 80, canvas.width * 2, 80);
+                
+                // NEW: AFTERIMAGES
+                for (let img of afterimages) {
+                    ctx.fillStyle = img.color;
+                    ctx.globalAlpha = img.life / 15 * 0.5;
+                    ctx.fillRect(img.x, img.y, img.w, img.h);
+                }
+                ctx.globalAlpha = 1;
 
-                // NPC
+
+                // NPC (Unchanged)
                 if (npc.alive) {
                     let npcBox = getNPCBox();
                     ctx.fillStyle = "#f33";
@@ -917,20 +1054,42 @@
                 ctx.fillRect(player.x, player.y, player.w, player.h);
                 ctx.globalAlpha = 1;
 
-                // ATTACK HITBOX
+                // ATTACK HITBOX (Unchanged)
                 if (player.attackTime > 0) {
                     let hitbox = getAttackBox();
                     ctx.fillStyle = "rgba(255,255,255,0.3)";
                     ctx.fillRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
                 }
 
-                // PARTICLES
+                // PARTICLES (Unchanged)
                 for (let p of particles) {
                     ctx.fillStyle = p.color;
                     ctx.fillRect(p.x, p.y, p.size, p.size);
                 }
 
-                // DRAW DAMAGE NUMBERS
+                // NEW: COMPLEX VFX (Shockwaves/Trails)
+                for (let vfx of vfxQueue) {
+                    ctx.globalAlpha = vfx.life / 30;
+                    if (vfx.type === 'shockwave') {
+                        const currentRadius = vfx.radius + (vfx.maxRadius - vfx.radius) * (1 - vfx.life / 30);
+                        ctx.strokeStyle = vfx.color;
+                        ctx.lineWidth = 4;
+                        ctx.beginPath();
+                        ctx.arc(vfx.x, vfx.y, currentRadius, Math.PI, 0); // Half circle from the ground
+                        ctx.stroke();
+                    } else if (vfx.type === 'projectileTrail') {
+                        ctx.fillStyle = vfx.color;
+                        const progress = 1 - vfx.life / 20;
+                        const currentX = vfx.x + (vfx.targetX - vfx.x) * progress;
+                        const currentY = vfx.y + (getNPCBox().y + getNPCBox().h / 2 - vfx.y) * progress;
+                        ctx.beginPath();
+                        ctx.arc(currentX, currentY, 10, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                ctx.globalAlpha = 1;
+
+                // DRAW DAMAGE NUMBERS (Unchanged)
                 ctx.font = "bold 18px Arial";
                 ctx.textAlign = "center";
                 for (let d of damageNumbers) {
