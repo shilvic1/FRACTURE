@@ -1,283 +1,959 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Fracture - Game</title>
-    <style>
-        body { margin:0; overflow:hidden; background:#111; }
-        canvas { display:block; }
+    <head>
+        <title>Fracture - Game</title>
+        <style>
+            body {
+                margin: 0;
+                overflow: hidden;
+                background: #111;
+            }
 
-        #ui {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            color: #0ff;
-            font-family: Arial;
-            font-size: 16px;
-            text-shadow: 0 0 6px #0ff;
-            z-index: 10;
-        }
+            canvas {
+                display: block;
+            }
 
-        #npcHpBar {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            width: 200px;
-            height: 20px;
-            background: #222;
-            border: 2px solid #f33;
-            display: none;
-        }
+            #ui {
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                color: #0ff;
+                font-family: Arial;
+                font-size: 16px;
+                text-shadow: 0 0 6px #0ff;
+                z-index: 10;
+            }
 
-        #npcHpBarInner {
-            height: 100%;
-            width: 100%;
-            background: #f33;
-        }
-    </style>
-</head>
-<body>
+            /* Main HUD Bar (Health, Energy, XP) */
+            #mainHud {
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+                z-index: 10;
+            }
 
-<canvas id="gameCanvas"></canvas>
+            .statBarContainer {
+                width: 200px;
+                height: 16px;
+                background: rgba(0, 0, 0, 0.5);
+                border: 1px solid #555;
+                position: relative;
+                box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+                border-radius: 2px;
+            }
 
-<div id="ui">
-    <div id="hp">HP: 100</div>
-    <div id="stamina">Stamina: 100</div>
-    <div id="level">Level: 1</div>
-    <div id="xp">XP: 0</div>
-    <div id="strength">Strength: 10</div>
-    <div id="speed">Speed: 4</div>
-    <div id="defense">Defense: 0</div>
-    <div id="energy">Energy: 100</div>
-</div>
+            .statBarInner {
+                height: 100%;
+                transition: width 0.1s linear;
+                position: absolute;
+                border-radius: 2px;
+            }
+            .statBarLabel {
+                position: absolute;
+                width: 100%;
+                text-align: center;
+                color: #fff;
+                font-size: 10px;
+                line-height: 16px;
+                font-weight: bold;
+                text-shadow: 1px 1px 2px #000;
+            }
 
-<div id="npcHpBar">
-    <div id="npcHpBarInner"></div>
-</div>
+            #hpBarInner { background: #f33; }
+            #energyBarInner { background: #00f; }
+            #xpBarInner { background: #0f0; }
 
-<script>
-// ===== CANVAS =====
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+            #levelDisplay {
+                position: absolute;
+                left: 210px;
+                top: 0px;
+                color: #0ff;
+                font-weight: bold;
+                font-size: 14px;
+                text-shadow: 0 0 5px #0ff;
+            }
 
-// ===== PLAYER STATS =====
-const player = {
-    x: 0, y: 0,
-    w: 40, h: 60,
-    velX: 0, velY: 0,
-    facing: 1,
-    jumping: false,
-    jumpCount:0,
-    maxJumps:2,
-    dashTime:0,
-    dashCooldown:0,
-    attackTime:0,
-    attackCooldown:0,
-    stamina: 100,
-    energy: 100,
-    hp: 100,
-    maxHp: 100,
-    level:1,
-    xp:0,
-    stats: {
-        speed:4,
-        strength:10,
-        defense:0,
-        energy:100
-    }
-};
+            #npcHpBar {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                width: 200px;
+                height: 20px;
+                background: #222;
+                border: 2px solid #f33;
+                display: none;
+            }
 
-// ===== NPC =====
-const npc = {
-    x:400,
-    y:0,
-    w:40,
-    h:60,
-    hp:100,
-    maxHp:100,
-    alive:true
-};
+            #npcHpBarInner {
+                height: 100%;
+                width: 100%;
+                background: #f33;
+            }
 
-// ===== INPUT =====
-const keys = {};
-document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+            /* Ability Bar (Unchanged) */
+            #abilityBar {
+                position: fixed;
+                bottom: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 200px;
+                background: rgba(40, 40, 40, 0.35);
+                border-top: 1px solid #b00;
+                border-bottom: 1px solid #b00;
+                padding: 4px;
+                text-align: center;
+                color: white;
+                font-family: Arial;
+                z-index: 20;
+                border-radius: 4px;
+            }
 
-let mouseDown = false;
-canvas.addEventListener("mousedown",()=>mouseDown=true);
-canvas.addEventListener("mouseup",()=>mouseDown=false);
+            #abilityTitle {
+                font-size: 10px;
+                letter-spacing: 1px;
+                font-weight: bold;
+                margin-bottom: 2px;
+                opacity: 0.8;
+            }
 
-// ===== PARTICLES =====
-const particles = [];
-function spawnParticle(x,y,color){
-    particles.push({
-        x,y,
-        size:Math.random()*4+2,
-        velX:(Math.random()*4-2),
-        velY:(Math.random()*-2),
-        life:15,
-        color
-    });
-}
+            .abilitySlot {
+                display: inline-block;
+                width: 40px;
+                height: 38px;
+                margin: 0 2px;
+                background: rgba(20, 20, 20, 0.55);
+                border: 1px solid #555;
+                padding: 2px;
+                border-radius: 4px;
+                position: relative;
+            }
 
-// ===== CAMERA =====
-let camX=0;
+            .abilityKey {
+                font-size: 11px;
+                color: #fff;
+            }
 
-// ===== HELPERS =====
-function rectCollide(a,b){
-    return a.x<a.x+b.w && a.x+a.w>b.x && a.y<a.y+b.h && a.y+a.h>b.y;
-}
+            .abilityName {
+                font-size: 8px;
+                margin-top: 1px;
+                color: #ccc;
+            }
 
-function getNPCBox(){
-    const ground = canvas.height - 80;
-    return {x:npc.x, y:ground - npc.h, w:npc.w, h:npc.h};
-}
+            .cooldownOverlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.45);
+                pointer-events: none;
+                clip-path: inset(0 0 0 0);
+                border-radius: 4px;
+            }
+            
+            /* Stats Menu Overlay */
+            #statsMenu {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 300px;
+                background: rgba(20, 30, 40, 0.95);
+                border: 2px solid #0ff;
+                color: white;
+                padding: 20px;
+                font-family: Arial;
+                display: none; /* Hidden by default */
+                z-index: 50;
+                box-shadow: 0 0 20px #0ff8;
+            }
+            #statsMenu h2 {
+                color: #0ff;
+                margin-top: 0;
+            }
+            .statLine {
+                display: flex;
+                justify-content: space-between;
+                padding: 5px 0;
+                border-bottom: 1px dashed #333;
+            }
+            .statButton {
+                background: #0ff;
+                color: #111;
+                border: none;
+                padding: 2px 8px;
+                cursor: pointer;
+                font-weight: bold;
+                border-radius: 2px;
+            }
+            #statPoints {
+                color: #f0f;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="gameCanvas"></canvas>
+        <div id="mainHud">
+            <div id="levelDisplay">Lvl: 1</div>
+            <div class="statBarContainer">
+                <div class="statBarInner" id="hpBarInner"></div>
+                <div class="statBarLabel" id="hpLabel">HP: 100 / 100</div>
+            </div>
+            <div class="statBarContainer">
+                <div class="statBarInner" id="energyBarInner"></div>
+                <div class="statBarLabel" id="energyLabel">Energy: 100 / 100</div>
+            </div>
+            <div class="statBarContainer">
+                <div class="statBarInner" id="xpBarInner"></div>
+                <div class="statBarLabel" id="xpLabel">XP: 0 / 100 (Level 1)</div>
+            </div>
+        </div>
+        
+        <div id="npcHpBar">
+            <div id="npcHpBarInner"></div>
+        </div>
 
-function getAttackBox(){
-    return {
-        x: player.x + (player.facing===1 ? player.w : -player.stats.strength*5),
-        y: player.y,
-        w: player.stats.strength*5,
-        h: player.h
-    };
-}
+        <div id="abilityBar">
+            <div id="abilityTitle">Universal: <span id="uniAbilityName">Punch</span> (LMB)</div>
+            <div class="abilitySlot" id="slot1">
+                <div class="cooldownOverlay" id="cool1"></div>
+                <div class="abilityKey">1</div>
+                <div class="abilityName" id="name1">Ability 1</div>
+            </div>
+            <div class="abilitySlot" id="slot2">
+                <div class="cooldownOverlay" id="cool2"></div>
+                <div class="abilityKey">2</div>
+                <div class="abilityName" id="name2">Ability 2</div>
+            </div>
+            <div class="abilitySlot" id="slot3">
+                <div class="cooldownOverlay" id="cool3"></div>
+                <div class="abilityKey">3</div>
+                <div class="abilityName" id="name3">Ability 3</div>
+            </div>
+            <div class="abilitySlot" id="slot4">
+                <div class="cooldownOverlay" id="cool4"></div>
+                <div class="abilityKey">4</div>
+                <div class="abilityName" id="name4">Punch</div>
+            </div>
+        </div>
+        
+        <div id="statsMenu">
+            <h2>Character Progression</h2>
+            <p>Unspent Stat Points: <span id="statPoints">0</span></p>
+            <div class="statLine">
+                <span>Strength: <span id="menuStr">10</span></span>
+                <button class="statButton" onclick="distributeStat('strength')">+</button>
+            </div>
+            <div class="statLine">
+                <span>Speed: <span id="menuSpd">4</span></span>
+                <button class="statButton" onclick="distributeStat('speed')">+</button>
+            </div>
+            <div class="statLine">
+                <span>Defense: <span id="menuDef">0</span></span>
+                <button class="statButton" onclick="distributeStat('defense')">+</button>
+            </div>
+            <div class="statLine">
+                <span>Max HP: <span id="menuHp">100</span></span>
+                <button class="statButton" onclick="distributeStat('maxHp')">+</button>
+            </div>
+            <div class="statLine">
+                <span>Energy: <span id="menuEng">100</span></span>
+                <button class="statButton" onclick="distributeStat('energy')">+</button>
+            </div>
+            <p style="margin-top: 15px; color: #aaa;">Press 'C' to Close.</p>
+        </div>
 
-// ===== UPDATE =====
-function update(){
-    // GRAVITY
-    player.velY += 0.8;
+        <script>
+            // ===== CANVAS & CONTEXT SETUP =====
+            const canvas = document.getElementById("gameCanvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = innerWidth;
+            canvas.height = innerHeight;
+            
+            // ===== PLAYER STATS (Default values) =====
+            const player = {
+                x: 0,
+                y: 0,
+                w: 40,
+                h: 60,
+                velX: 0,
+                velY: 0,
+                facing: 1,
+                jumpCount: 0,
+                maxJumps: 2,
+                dashTime: 0,
+                dashCooldown: 0,
+                attackTime: 0,
+                attackCooldown: 0,
+                stamina: 100,
+                energy: 100,
+                hp: 100,
+                maxHp: 100,
+                level: 1,
+                xp: 0,
+                xpToNextLevel: 100, // Starting XP required
+                unspentStatPoints: 0, // NEW: For leveling up
+                invincible: false,
+                berserkMode: false,
+                stats: {
+                    speed: 4,
+                    strength: 10,
+                    defense: 0,
+                    energy: 100,
+                    reflectDamage: 0
+                }
+            };
+            
+            // Leveling curve (Example: Linear increase)
+            function getXPForLevel(level) {
+                return 100 + (level - 1) * 50; // 100, 150, 200, 250, etc.
+            }
 
-    // FACING
-    if(keys["a"]) player.facing=-1;
-    if(keys["d"]) player.facing=1;
+            // ===== CHARACTER CREATOR/BUILD SELECTION (Simulated) =====
+            const savedBuild = localStorage.getItem('fracture_charbuild') || 'Strength'; // Changed default to Strength for variety
+            
+            const buildStats = {
+                'Strength': { str: 18, spd: 3, def: 0, maxHp: 100, abilityNames: ["Ground Smash", "Punch Combo", "Berserk Mode", "Punch"] },
+                'Speed': { str: 7, spd: 8, def: 0, maxHp: 100, abilityNames: ["Dash Burst", "Double Jump", "Blur (Invinc)", "Punch"] },
+                'Defense': { str: 10, spd: 4, def: 5, maxHp: 140, reflectDamage: 0.3, abilityNames: ["Shield Wall", "Armor Boost", "Thorns (Reflect)", "Punch"] },
+                'Energy': { str: 10, spd: 4, def: 0, maxHp: 100, energy: 150, abilityNames: ["Fireball", "Energy Beam", "Teleport", "Punch"] }
+            };
 
-    // SPRINT
-    let moveSpeed = keys["shift"]&&player.stamina>0 ? player.stats.speed*1.7 : player.stats.speed;
-    if(keys["shift"]&&player.stamina>0) player.stamina-=0.5;
-    else player.stamina+=0.4;
-    player.stamina=Math.max(0,Math.min(100,player.stamina));
+            // Apply build stats
+            const b = buildStats[savedBuild];
+            player.stats.strength = b.str;
+            player.stats.speed = b.spd;
+            player.stats.defense = b.def;
+            player.maxHp = b.maxHp;
+            player.hp = b.maxHp;
+            player.stats.reflectDamage = b.reflectDamage || 0;
+            player.stats.energy = b.energy || 100;
+            player.energy = player.stats.energy;
+            player.xpToNextLevel = getXPForLevel(player.level);
 
-    // MOVEMENT
-    if(keys["a"]) player.velX=-moveSpeed;
-    else if(keys["d"]) player.velX=moveSpeed;
-    else player.velX*=0.8;
+            // Update UI names
+            document.getElementById("name1").innerText = b.abilityNames[0];
+            document.getElementById("name2").innerText = b.abilityNames[1];
+            document.getElementById("name3").innerText = b.abilityNames[2];
+            document.getElementById("name4").innerText = b.abilityNames[3];
+            document.getElementById("abilityTitle").innerText = `${savedBuild} Build Active`;
 
-    // DOUBLE JUMP
-    if(keys[" "]&&player.jumpCount<player.maxJumps){
-        player.velY=-12;
-        spawnParticle(player.x+20,player.y+player.h,"#0ff");
-        player.jumpCount++;
-        keys[" "]=false;
-    }
+            // ===== NPC ===== (Giving XP upon defeat)
+            const npc = {
+                x: 400,
+                y: 0,
+                w: 40,
+                h: 60,
+                hp: 300,
+                maxHp: 300,
+                alive: true,
+                xpValue: 50 // NEW: XP reward
+            };
 
-    // DASH
-    if(keys["q"]&&player.dashCooldown<=0){
-        player.dashTime=10;
-        player.dashCooldown=30;
-        player.velX=player.facing*14;
-        spawnParticle(player.x+player.w/2,player.y+player.h/2,"#3af");
-        keys["q"]=false;
-    }
-    if(player.dashTime>0) player.dashTime--;
-    if(player.dashCooldown>0) player.dashCooldown--;
+            // ===== INPUT & VFX ARRAYS =====
+            const keys = {};
+            document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+            document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+            let mouseDown = false;
+            canvas.addEventListener("mousedown", () => mouseDown = true);
+            canvas.addEventListener("mouseup", () => mouseDown = false);
 
-    // ATTACK
-    if(mouseDown && player.attackCooldown<=0){
-        player.attackTime=10;
-        player.attackCooldown=20;
-        let hitbox=getAttackBox();
-        let npcBox=getNPCBox();
-        if(rectCollide(hitbox,npcBox) && npc.alive){
-            npc.hp -= player.stats.strength;
-            spawnParticle(npc.x+npc.w/2,npc.y+npc.h/2,"#f44");
-            document.getElementById("npcHpBar").style.display="block";
-        }
-    }
-    if(player.attackTime>0) player.attackTime--;
-    if(player.attackCooldown>0) player.attackCooldown--;
+            let menuOpen = false; // NEW: State for the stats menu
+            document.addEventListener("keydown", (e) => {
+                if (e.key.toLowerCase() === "c") {
+                    menuOpen = !menuOpen;
+                    document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
+                    if (menuOpen) updateStatsMenu(); // Refresh menu when opened
+                }
+            });
 
-    // POSITION
-    player.x+=player.velX;
-    player.y+=player.velY;
+            const damageNumbers = [];
+            const particles = [];
+            let camX = 0;
+            let abilityCooldowns = [0, 0, 0, 0];
+            let screenShakeTime = 0;
+            let shakeIntensity = 0;
 
-    // GROUND
-    const ground=canvas.height-80;
-    if(player.y+player.h>ground){
-        player.y=ground-player.h;
-        player.velY=0;
-        player.jumpCount=0;
-    }
+            function triggerScreenShake(duration = 8, intensity = 4) {
+                screenShakeTime = duration;
+                shakeIntensity = intensity;
+            }
 
-    // PARTICLES
-    for(let i=particles.length-1;i>=0;i--){
-        let p=particles[i];
-        p.x+=p.velX;
-        p.y+=p.velY;
-        p.life--;
-        p.size*=0.92;
-        if(p.life<=0) particles.splice(i,1);
-    }
+            // ===== NEW: XP & LEVEL UP LOGIC =====
+            function gainXP(amount) {
+                if (!player.alive) return; // Stop gaining XP if dead (hypothetical)
+                player.xp += amount;
+                createDamageNumber(amount + " XP", player.x + player.w / 2, player.y - 20, "#00ff00");
+                
+                while (player.xp >= player.xpToNextLevel) {
+                    levelUp();
+                }
+            }
 
-    // CAMERA
-    camX += ((player.x-canvas.width/2)-camX)*0.08;
+            function levelUp() {
+                player.xp -= player.xpToNextLevel;
+                player.level++;
+                player.xpToNextLevel = getXPForLevel(player.level);
+                player.unspentStatPoints += 3; // +3 stat points per level
 
-    // UPDATE UI
-    document.getElementById("hp").innerText="HP: "+parseInt(player.hp);
-    document.getElementById("stamina").innerText="Stamina: "+parseInt(player.stamina);
-    document.getElementById("level").innerText="Level: "+player.level;
-    document.getElementById("xp").innerText="XP: "+player.xp;
-    document.getElementById("strength").innerText="Strength: "+player.stats.strength;
-    document.getElementById("speed").innerText="Speed: "+player.stats.speed;
-    document.getElementById("defense").innerText="Defense: "+player.stats.defense;
-    document.getElementById("energy").innerText="Energy: "+player.stats.energy;
+                // Full heal upon level up
+                player.hp = player.maxHp;
+                player.energy = player.stats.energy;
 
-    // NPC DEAD CHECK
-    if(npc.hp<=0) npc.alive=false;
-    document.getElementById("npcHpBarInner").style.width = npc.hp>0? npc.hp+"%" : "0%";
-}
+                // VFX for level up
+                triggerScreenShake(20, 10);
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#f0f", 50, 15);
+                createDamageNumber("LEVEL UP!", player.x + player.w / 2, player.y - 40, "#f0f");
 
-// ===== DRAW =====
-function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.save();
-    ctx.translate(-camX,0);
+                // Check for ability unlocks (Conceptual)
+                if (player.level === 3) console.log("Ability Upgrade Unlocked!");
+            }
 
-    // GROUND
-    ctx.fillStyle="#222";
-    ctx.fillRect(camX,canvas.height-80,canvas.width*2,80);
+            // NEW: Stat Distribution Logic
+            function distributeStat(stat) {
+                if (player.unspentStatPoints <= 0) return;
+                player.unspentStatPoints--;
 
-    // NPC
-    if(npc.alive){
-        let npcBox=getNPCBox();
-        ctx.fillStyle="#f33";
-        ctx.fillRect(npcBox.x,npcBox.y,npcBox.w,npcBox.h);
-    }
+                if (stat === 'maxHp') {
+                    player.maxHp += 10;
+                    player.hp += 10;
+                } else if (stat === 'energy') {
+                    player.stats.energy += 5;
+                    player.energy += 5;
+                } else {
+                    player.stats[stat]++;
+                }
+                updateStatsMenu();
+            }
 
-    // PLAYER
-    ctx.fillStyle="#4af";
-    ctx.fillRect(player.x,player.y,player.w,player.h);
+            // ===== VFX HELPERS (UNMODIFIED) =====
+            function createDamageNumber(amount, x, y, color = "#ffffff") {
+                damageNumbers.push({
+                    text: Math.ceil(amount).toString(),
+                    x: x,
+                    y: y,
+                    velY: -3,
+                    velX: (Math.random() - 0.5) * 0.5,
+                    life: 60,
+                    color: color
+                });
+            }
 
-    // ATTACK HITBOX
-    if(player.attackTime>0){
-        let hitbox=getAttackBox();
-        ctx.fillStyle="rgba(255,255,255,0.3)";
-        ctx.fillRect(hitbox.x,hitbox.y,hitbox.w,hitbox.h);
-    }
+            function spawnParticle(x, y, color) {
+                particles.push({
+                    x, y,
+                    size: Math.random() * 4 + 2,
+                    velX: (Math.random() * 4 - 2),
+                    velY: (Math.random() * -2),
+                    life: 15,
+                    color
+                });
+            }
 
-    // PARTICLES
-    for(let p of particles){
-        ctx.fillStyle=p.color;
-        ctx.fillRect(p.x,p.y,p.size,p.size);
-    }
+            function burstParticles(x, y, color, count = 12, power = 4) {
+                for (let i = 0; i < count; i++) {
+                    particles.push({
+                        x, y,
+                        size: Math.random() * 5 + 3,
+                        velX: (Math.random() * power - power / 2),
+                        velY: (Math.random() * power - power / 2),
+                        life: 20,
+                        color
+                    });
+                }
+            }
 
-    ctx.restore();
-}
+            // ===== COMBAT HELPERS (MODIFIED to include XP gain) =====
+            function rectCollide(a, b) {
+                return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+            }
 
-// ===== LOOP =====
-function loop(){ update(); draw(); requestAnimationFrame(loop);}
-loop();
-</script>
+            function getNPCBox() {
+                const ground = canvas.height - 80;
+                return {
+                    x: npc.x,
+                    y: ground - npc.h,
+                    w: npc.w,
+                    h: npc.h
+                };
+            }
 
-</body>
+            function getAttackBox(customWidth) {
+                const width = customWidth || (20 + player.stats.strength * 1.5);
+                return {
+                    x: player.x + (player.facing === 1 ? player.w : -width),
+                    y: player.y,
+                    w: width,
+                    h: player.h
+                };
+            }
+
+            function dealDamageToNPC(amount, isAbility = false) {
+                let npcBox = getNPCBox();
+                let hitbox = getAttackBox();
+                let finalDmg = amount;
+
+                if (rectCollide(hitbox, npcBox) && npc.alive) {
+                    // Critical Hit Logic
+                    let dmgColor = isAbility ? "#00ffff" : "#ffffff";
+                    let isCrit = Math.random() < 0.1;
+
+                    if (isCrit) {
+                        finalDmg *= 1.5;
+                        dmgColor = "#ff00ff";
+                    }
+
+                    // Berserk Bonus
+                    if (player.berserkMode) {
+                        finalDmg *= 1.25;
+                    }
+
+                    npc.hp -= finalDmg;
+
+                    // --- SCREEN SHAKE ---
+                    if (isAbility) {
+                        triggerScreenShake(12, 6);
+                    } else {
+                        triggerScreenShake(5, 2);
+                    }
+                    // --------------------
+
+                    createDamageNumber(finalDmg, npcBox.x + npcBox.w / 2, npcBox.y, dmgColor);
+                    burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#f44");
+                    document.getElementById("npcHpBar").style.display = "block";
+                    
+                    if (npc.hp <= 0 && npc.alive) {
+                        npc.alive = false;
+                        gainXP(npc.xpValue); // Grant XP on kill
+                    }
+                }
+            }
+            
+            // NPC Basic Attack (Conceptual for Defense Build reflection)
+            function dealDamageToPlayer(amount) {
+                if (player.invincible) return;
+
+                let incomingDmg = amount - player.stats.defense;
+                if (incomingDmg < 1) incomingDmg = 1; // Minimum damage
+
+                // Defense Build - Reflect Logic
+                if (player.stats.reflectDamage > 0) {
+                    let reflectedDmg = incomingDmg * player.stats.reflectDamage;
+                    dealDamageToNPC(reflectedDmg, true); // Reflect damage back to NPC
+                    createDamageNumber(reflectedDmg + " Reflect", npc.x + npc.w / 2, npc.y - 10, "#00ff00");
+                }
+
+                player.hp -= incomingDmg;
+                if (player.hp < 0) player.hp = 0;
+            }
+            
+            // Simulation of NPC attacking every 2 seconds
+            setInterval(() => {
+                if (npc.alive && !menuOpen) {
+                    // Basic attack simulation
+                    if (Math.abs(player.x - npc.x) < 100) {
+                        dealDamageToPlayer(15);
+                    }
+                }
+                // Respawn NPC if dead for testing
+                if (!npc.alive) {
+                    npc.hp = npc.maxHp;
+                    npc.alive = true;
+                    document.getElementById("npcHpBar").style.display = "none";
+                }
+
+            }, 2000);
+
+
+            // ===================== UNIVERSAL & BUILD ABILITIES (Energy cost added) =====================
+            function universalPunch() {
+                if (player.attackCooldown <= 0) {
+                    player.attackTime = 10;
+                    player.attackCooldown = 20;
+                    let damage = player.stats.strength + (Math.random() * 4);
+                    dealDamageToNPC(damage, false);
+                }
+            }
+
+            // --- SPEED BUILD ABILITIES --- (Cost added)
+            function speed_ability1() {
+                if (abilityCooldowns[0] > 0 || player.stamina < 30) return;
+                player.stamina -= 30;
+                abilityCooldowns[0] = 70;
+                player.dashTime = 15;
+                player.velX = player.facing * 18;
+                burstParticles(player.x, player.y + player.h / 2, "#4aff00", 20, 5);
+                setTimeout(() => {
+                    let dmg = player.stats.speed * 2.5;
+                    dealDamageToNPC(dmg, true);
+                    triggerScreenShake(10, 5);
+                }, 200);
+            }
+
+            function speed_ability2() {
+                if (abilityCooldowns[1] > 0) return;
+                abilityCooldowns[1] = 90;
+                player.jumpCount = 0;
+                player.velY = -12;
+                spawnParticle(player.x + 20, player.y + player.h, "#0ff");
+            }
+
+            function speed_ability3() {
+                if (abilityCooldowns[2] > 0 || player.energy < 20) return;
+                player.energy -= 20;
+                abilityCooldowns[2] = 180;
+                player.invincible = true;
+                setTimeout(() => {
+                    player.invincible = false;
+                }, 1000);
+            }
+
+            // --- STRENGTH BUILD ABILITIES --- (Energy cost added)
+            function strength_ability1() {
+                if (abilityCooldowns[0] > 0 || player.energy < 30) return;
+                player.energy -= 30;
+                abilityCooldowns[0] = 90;
+                let dmg = player.stats.strength * 2.5;
+                dealDamageToNPC(dmg, true);
+                burstParticles(player.x + player.w / 2, canvas.height - 80, "#ff0000", 30, 8);
+                triggerScreenShake(15, 8);
+            }
+
+            function strength_ability2() {
+                if (abilityCooldowns[1] > 0 || player.stamina < 40) return;
+                player.stamina -= 40;
+                abilityCooldowns[1] = 60;
+                let hits = 4;
+                let dmgPerHit = player.stats.strength * 0.7;
+                for (let i = 0; i < hits; i++) {
+                    setTimeout(() => {
+                        dealDamageToNPC(dmgPerHit, true);
+                    }, i * 100);
+                }
+            }
+
+            function strength_ability3() {
+                if (abilityCooldowns[2] > 0 || player.energy < 50) return;
+                player.energy -= 50;
+                abilityCooldowns[2] = 240;
+                player.berserkMode = true;
+                player.stats.defense = -5;
+                setTimeout(() => {
+                    player.berserkMode = false;
+                    player.stats.defense = buildStats[savedBuild].def;
+                }, 4000);
+            }
+
+            // --- DEFENSE BUILD ABILITIES --- (Cost added)
+            function defense_ability1() {
+                if (abilityCooldowns[0] > 0 || player.energy < 15) return;
+                player.energy -= 15;
+                abilityCooldowns[0] = 120;
+                player.stats.defense += 10;
+                setTimeout(() => {
+                    player.stats.defense -= 10;
+                }, 2000);
+            }
+
+            function defense_ability2() {
+                if (abilityCooldowns[1] > 0 || player.energy < 20) return;
+                player.energy -= 20;
+                abilityCooldowns[1] = 180;
+                let heal = player.maxHp * 0.15;
+                player.hp = Math.min(player.maxHp, player.hp + heal);
+            }
+
+            function defense_ability3() {
+                if (abilityCooldowns[2] > 0 || player.energy < 10) return;
+                player.energy -= 10;
+                abilityCooldowns[2] = 180;
+                player.stats.reflectDamage = 0.5;
+                setTimeout(() => {
+                    player.stats.reflectDamage = 0.3;
+                }, 3000);
+            }
+
+            // --- ENERGY BUILD ABILITIES --- (Energy cost already implemented)
+            function energy_ability1() {
+                if (abilityCooldowns[0] > 0 || player.energy < 25) return;
+                player.energy -= 25;
+                abilityCooldowns[0] = 90;
+                let dmg = player.stats.energy * 0.8;
+                dealDamageToNPC(dmg, true);
+                burstParticles(npc.x, npc.y + npc.h / 2, "#ff6600", 25, 6);
+            }
+
+            function energy_ability2() {
+                if (abilityCooldowns[1] > 0 || player.energy < 40) return;
+                player.energy -= 40;
+                abilityCooldowns[1] = 150;
+                let dmg = player.stats.energy * 1.5;
+                dealDamageToNPC(dmg, true);
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 40, 10);
+                triggerScreenShake(15, 7);
+            }
+
+            function energy_ability3() {
+                if (abilityCooldowns[2] > 0 || player.energy < 15) return;
+                player.energy -= 15;
+                abilityCooldowns[2] = 60;
+                burstParticles(player.x, player.y + player.h / 2, "#8800ff", 15, 3);
+                player.x += player.facing * 150;
+                burstParticles(player.x, player.y + player.h / 2, "#8800ff", 15, 3);
+            }
+
+            // ===================== ABILITY HANDLER & INPUT =====================
+            function ability1() {
+                if (menuOpen) return;
+                if (savedBuild === 'Speed') speed_ability1();
+                else if (savedBuild === 'Strength') strength_ability1();
+                else if (savedBuild === 'Defense') defense_ability1();
+                else if (savedBuild === 'Energy') energy_ability1();
+            }
+
+            function ability2() {
+                if (menuOpen) return;
+                if (savedBuild === 'Speed') speed_ability2();
+                else if (savedBuild === 'Strength') strength_ability2();
+                else if (savedBuild === 'Defense') defense_ability2();
+                else if (savedBuild === 'Energy') energy_ability2();
+            }
+
+            function ability3() {
+                if (menuOpen) return;
+                if (savedBuild === 'Speed') speed_ability3();
+                else if (savedBuild === 'Strength') strength_ability3();
+                else if (savedBuild === 'Defense') defense_ability3();
+                else if (savedBuild === 'Energy') energy_ability3();
+            }
+
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "1") ability1();
+                if (e.key === "2") ability2();
+                if (e.key === "3") ability3();
+            });
+
+            function updateAbilityCooldowns() {
+                for (let i = 0; i < abilityCooldowns.length; i++) {
+                    if (abilityCooldowns[i] > 0) abilityCooldowns[i]--;
+                }
+            }
+
+            // ===== UPDATE LOOP =====
+            function update() {
+                if (menuOpen) return; // Pause game logic when menu is open
+
+                // Player Movement, Physics, etc.
+                player.velY += 0.8;
+                if (keys["a"]) player.facing = -1;
+                if (keys["d"]) player.facing = 1;
+                let moveSpeed = keys["shift"] && player.stamina > 0 ? player.stats.speed * 1.7 : player.stats.speed;
+                
+                // Stamina management
+                if (keys["shift"] && player.stamina > 0) player.stamina -= 0.5;
+                else player.stamina += 0.4;
+                player.stamina = Math.max(0, Math.min(100, player.stamina));
+
+                // Energy regeneration (Simple implementation)
+                player.energy += 0.5;
+                player.energy = Math.min(player.stats.energy, player.energy);
+
+
+                if (keys["a"]) player.velX = -moveSpeed;
+                else if (keys["d"]) player.velX = moveSpeed;
+                else player.velX *= 0.8;
+
+                if (keys[" "] && player.jumpCount < player.maxJumps) {
+                    player.velY = -12;
+                    spawnParticle(player.x + 20, player.y + player.h, "#0ff");
+                    player.jumpCount++;
+                    keys[" "] = false;
+                }
+
+                if (player.dashTime > 0) player.dashTime--;
+                if (player.dashCooldown > 0) player.dashCooldown--;
+
+                // UNIVERSAL PUNCH (LMB)
+                if (mouseDown) universalPunch();
+                if (player.attackTime > 0) player.attackTime--;
+                if (player.attackCooldown > 0) player.attackCooldown--;
+
+                // POSITION
+                player.x += player.velX;
+                player.y += player.velY;
+                const ground = canvas.height - 80;
+                if (player.y + player.h > ground) {
+                    player.y = ground - player.h;
+                    player.velY = 0;
+                    player.jumpCount = 0;
+                }
+
+                // VFX & COOLDOWN UPDATES
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    let p = particles[i];
+                    p.x += p.velX;
+                    p.y += p.velY;
+                    p.life--;
+                    p.size *= 0.92;
+                    if (p.life <= 0) particles.splice(i, 1);
+                }
+                for (let i = damageNumbers.length - 1; i >= 0; i--) {
+                    let d = damageNumbers[i];
+                    d.y += d.velY;
+                    d.x += d.velX;
+                    d.velY *= 0.96;
+                    d.life--;
+                    if (d.life <= 0) damageNumbers.splice(i, 1);
+                }
+
+                updateAbilityCooldowns();
+
+                // CAMERA & SCREEN SHAKE UPDATE
+                if (screenShakeTime > 0) {
+                    screenShakeTime--;
+                }
+                camX += ((player.x - canvas.width / 2) - camX) * 0.08;
+
+                // UI UPDATES (New and Consolidated)
+                updateMainHUD();
+                updateCooldownUI();
+            }
+
+            // ===== UI / HUD Features (New Functions) =====
+            
+            // 6.1 Main HUD: Health, Energy, XP, Level progress
+            function updateMainHUD() {
+                // HP Bar
+                const hpRatio = player.hp / player.maxHp;
+                document.getElementById("hpBarInner").style.width = (hpRatio * 100) + "%";
+                document.getElementById("hpLabel").innerText = `HP: ${parseInt(player.hp)} / ${player.maxHp}`;
+                
+                // Energy Bar
+                const energyRatio = player.energy / player.stats.energy;
+                document.getElementById("energyBarInner").style.width = (energyRatio * 100) + "%";
+                document.getElementById("energyLabel").innerText = `Energy: ${parseInt(player.energy)} / ${player.stats.energy}`;
+
+                // XP Bar
+                const xpRatio = player.xp / player.xpToNextLevel;
+                document.getElementById("xpBarInner").style.width = (xpRatio * 100) + "%";
+                document.getElementById("xpLabel").innerText = `XP: ${parseInt(player.xp)} / ${player.xpToNextLevel}`;
+                document.getElementById("levelDisplay").innerText = `Lvl: ${player.level}`;
+                
+                // NPC HP
+                if (npc.alive) {
+                    document.getElementById("npcHpBarInner").style.width = (npc.hp / npc.maxHp * 100) + "%";
+                }
+            }
+
+            // 6.1 Cooldowns (skill timers)
+            function updateCooldownUI() {
+                const maxCooldowns = [70, 90, 180, 0];
+                for (let i = 0; i < 4; i++) {
+                    const cooldown = abilityCooldowns[i];
+                    const max = maxCooldowns[i] || 1;
+                    let ratio = cooldown / max;
+                    if (ratio < 0) ratio = 0;
+                    document.getElementById("cool" + (i + 1)).style.clipPath = `inset(${ratio * 100}% 0 0 0)`;
+                }
+            }
+            
+            // Upgrade / Skill Menu (Stats)
+            function updateStatsMenu() {
+                document.getElementById('statPoints').innerText = player.unspentStatPoints;
+                document.getElementById('menuStr').innerText = player.stats.strength;
+                document.getElementById('menuSpd').innerText = player.stats.speed;
+                document.getElementById('menuDef').innerText = player.stats.defense;
+                document.getElementById('menuHp').innerText = player.maxHp;
+                document.getElementById('menuEng').innerText = player.stats.energy;
+
+                // Hide/Show '+' button if no points are available
+                const buttons = document.querySelectorAll('#statsMenu .statButton');
+                buttons.forEach(btn => {
+                    btn.style.display = player.unspentStatPoints > 0 ? 'inline-block' : 'none';
+                });
+            }
+
+
+            // ===== DRAW LOOP =====
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
+
+                // --- SCREEN SHAKE APPLICATION ---
+                let shakeOffsetX = 0;
+                let shakeOffsetY = 0;
+                if (screenShakeTime > 0) {
+                    shakeOffsetX = (Math.random() - 0.5) * shakeIntensity;
+                    shakeOffsetY = (Math.random() - 0.5) * shakeIntensity;
+                }
+                ctx.translate(shakeOffsetX, shakeOffsetY);
+                // --------------------------------
+
+                ctx.translate(-camX, 0);
+
+                // GROUND
+                ctx.fillStyle = "#222";
+                ctx.fillRect(camX, canvas.height - 80, canvas.width * 2, 80);
+
+                // NPC
+                if (npc.alive) {
+                    let npcBox = getNPCBox();
+                    ctx.fillStyle = "#f33";
+                    ctx.fillRect(npcBox.x, npcBox.y, npcBox.w, npcBox.h);
+                }
+
+                // PLAYER
+                ctx.fillStyle = "#4af";
+                if (player.invincible) {
+                    ctx.fillStyle = "#00ffff";
+                    ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.3;
+                } else if (player.berserkMode) {
+                    ctx.fillStyle = "#ff5555";
+                }
+                ctx.fillRect(player.x, player.y, player.w, player.h);
+                ctx.globalAlpha = 1;
+
+                // ATTACK HITBOX
+                if (player.attackTime > 0) {
+                    let hitbox = getAttackBox();
+                    ctx.fillStyle = "rgba(255,255,255,0.3)";
+                    ctx.fillRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
+                }
+
+                // PARTICLES
+                for (let p of particles) {
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(p.x, p.y, p.size, p.size);
+                }
+
+                // DRAW DAMAGE NUMBERS
+                ctx.font = "bold 18px Arial";
+                ctx.textAlign = "center";
+                for (let d of damageNumbers) {
+                    const alpha = d.life / 60;
+                    ctx.fillStyle = d.color;
+                    ctx.globalAlpha = alpha;
+                    ctx.strokeStyle = "#000000";
+                    ctx.lineWidth = 3;
+                    ctx.strokeText(d.text, d.x, d.y);
+                    ctx.fillText(d.text, d.x, d.y);
+                }
+                ctx.globalAlpha = 1;
+
+                ctx.restore();
+            }
+
+            // ===== GAME LOOP =====
+            function loop() {
+                update();
+                draw();
+                requestAnimationFrame(loop);
+            }
+            loop();
+        </script>
+    </body>
 </html>
