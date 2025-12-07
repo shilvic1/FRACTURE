@@ -1,790 +1,934 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>Fracture - Game</title>
-        <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-        <style>
-            body {
-                margin: 0;
-                overflow: hidden;
-                background: #111;
-            }
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Fracture — Online Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --accent: #00ffff;
+            --bg: #111;
+        }
 
-            canvas {
-                display: block;
-            }
+        * {
+            box-sizing: border-box
+        }
 
-            /* Main HUD Bar (Health, Energy, XP) */
-            #mainHud {
-                position: fixed;
-                top: 10px;
-                left: 10px;
-                display: flex;
-                flex-direction: column;
-                gap: 5px;
-                z-index: 10;
-            }
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: var(--bg);
+            color: white;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
 
-            .statBarContainer {
-                width: 200px;
-                height: 16px;
-                background: rgba(0, 0, 0, 0.5);
-                border: 1px solid #555;
-                position: relative;
-                box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
-                border-radius: 2px;
-            }
+        canvas {
+            display: block;
+        }
 
-            .statBarInner {
-                height: 100%;
-                transition: width 0.1s linear;
-                position: absolute;
-                border-radius: 2px;
-            }
-            .statBarLabel {
-                position: absolute;
-                width: 100%;
-                text-align: center;
-                color: #fff;
-                font-size: 10px;
-                line-height: 16px;
-                font-weight: bold;
-                text-shadow: 1px 1px 2px #000;
-            }
-
-            #hpBarInner { background: #f33; }
-            #energyBarInner { background: #00f; }
-            #xpBarInner { background: #0f0; }
-
-            #levelDisplay {
-                position: absolute;
-                left: 210px;
-                top: 0px;
-                color: #0ff;
-                font-weight: bold;
-                font-size: 14px;
-                text-shadow: 0 0 5px #0ff;
-            }
-
-            /* DPS Meter & Combo Counter Container */
-            #combatInfo {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                display: flex;
-                flex-direction: column;
-                align-items: flex-end;
-                z-index: 10;
-                color: #fff;
-                font-family: Arial;
-                text-shadow: 1px 1px 2px #000;
-            }
-
-            #dpsMeter {
-                font-size: 18px;
-                font-weight: bold;
-                color: #f00; /* Red for damage */
-                text-shadow: 0 0 8px #f008;
-                margin-bottom: 5px;
-            }
-
-            #comboCounter {
-                font-size: 24px;
-                font-weight: bold;
-                color: #ffaa00; /* Gold/Orange for combo */
-                text-shadow: 0 0 10px #ffaa00;
-                transition: transform 0.1s ease-out;
-            }
-            
-            /* NPC HP Bar */
-            #npcHpBar {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                width: 200px;
-                height: 20px;
-                background: #222;
-                border: 2px solid #f33;
-                display: none;
-            }
-
-            #npcHpBarInner {
-                height: 100%;
-                width: 100%;
-                background: #f33;
-            }
-
-            /* Ability Bar */
-            #abilityBar {
-                position: fixed;
-                bottom: 10px;
-                left: 50%;
-                transform: translateX(-50%);
-                width: 200px;
-                background: rgba(40, 40, 40, 0.35);
-                border-top: 1px solid #b00;
-                border-bottom: 1px solid #b00;
-                padding: 4px;
-                text-align: center;
-                color: white;
-                font-family: Arial;
-                z-index: 20;
-                border-radius: 4px;
-            }
-
-            #abilityTitle {
-                font-size: 10px;
-                letter-spacing: 1px;
-                font-weight: bold;
-                margin-bottom: 2px;
-                opacity: 0.8;
-            }
-
-            .abilitySlot {
-                display: inline-block;
-                width: 40px;
-                height: 38px;
-                margin: 0 2px;
-                background: rgba(20, 20, 20, 0.55);
-                border: 1px solid #555;
-                padding: 2px;
-                border-radius: 4px;
-                position: relative;
-            }
-
-            .abilityKey {
-                font-size: 11px;
-                color: #fff;
-            }
-
-            .abilityName {
-                font-size: 8px;
-                margin-top: 1px;
-                color: #ccc;
-            }
-
-            .cooldownOverlay {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.45);
-                pointer-events: none;
-                clip-path: inset(0 0 0 0);
-                border-radius: 4px;
-            }
-            
-            /* Stats Menu Overlay */
-            #statsMenu {
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 300px;
-                background: rgba(20, 30, 40, 0.95);
-                border: 2px solid #0ff;
-                color: white;
-                padding: 20px;
-                font-family: Arial;
-                display: none; /* Hidden by default */
-                z-index: 50;
-                box-shadow: 0 0 20px #0ff8;
-            }
-            #statsMenu h2 {
-                color: #0ff;
-                margin-top: 0;
-            }
-            .statLine {
-                display: flex;
-                justify-content: space-between;
-                padding: 5px 0;
-                border-bottom: 1px dashed #333;
-            }
-            .statButton {
-                background: #0ff;
-                color: #111;
-                border: none;
-                padding: 2px 8px;
-                cursor: pointer;
-                font-weight: bold;
-                border-radius: 2px;
-            }
-            #statPoints {
-                color: #f0f;
-                font-weight: bold;
-            }
-
-            /* Low HP Overlay */
-            #lowHpOverlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(255, 0, 0, 0.0); /* Start transparent */
-                pointer-events: none;
-                z-index: 5; /* Below HUD, above canvas */
-                transition: background-color 0.1s ease-out; /* Smoother flash transition */
-            }
-        </style>
-    </head>
-    <body>
-        <canvas id="gameCanvas"></canvas>
-        <div id="lowHpOverlay"></div>
+        /* --- New/Shared UI for Online Status --- */
+        #gameStatus {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            font-family: 'Press Start 2P', monospace;
+            text-align: center;
+        }
         
-        <div id="mainHud">
-            <div id="levelDisplay">Lvl: 1</div>
-            <div class="statBarContainer">
-                <div class="statBarInner" id="hpBarInner"></div>
-                <div class="statBarLabel" id="hpLabel">HP: 100 / 100</div>
-            </div>
-            <div class="statBarContainer">
-                <div class="statBarInner" id="energyBarInner"></div>
-                <div class="statBarLabel" id="energyLabel">Energy: 100 / 100</div>
-            </div>
-            <div class="statBarContainer">
-                <div class="statBarInner" id="xpBarInner"></div>
-                <div class="statBarLabel" id="xpLabel">XP: 0 / 100 (Level 1)</div>
-            </div>
-        </div>
-
-        <div id="combatInfo">
-            <div id="dpsMeter">DPS: 0.0</div>
-            <div id="comboCounter"></div>
-        </div>
+        #gameStatus h2 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        /* --- End New/Shared UI for Online Status --- */
         
-        <div id="npcHpBar">
-            <div id="npcHpBarInner"></div>
-        </div>
+        /* Main HUD Bar (Health, Energy, XP) */
+        #mainHud {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 10;
+        }
 
-        <div id="abilityBar">
-            <div id="abilityTitle">Universal: <span id="uniAbilityName">Punch</span> (LMB) </div>
-            <div class="abilitySlot" id="slot1">
-                <div class="cooldownOverlay" id="cool1"></div>
-                <div class="abilityKey">1</div>
-                <div class="abilityName" id="name1">Ability 1</div>
-            </div>
-            <div class="abilitySlot" id="slot2">
-                <div class="cooldownOverlay" id="cool2"></div>
-                <div class="abilityKey">2</div>
-                <div class="abilityName" id="name2">Ability 2</div>
-            </div>
-            <div class="abilitySlot" id="slot3">
-                <div class="cooldownOverlay" id="cool3"></div>
-                <div class="abilityKey">3</div>
-                <div class="abilityName" id="name3">Ability 3</div>
-            </div>
-            <div class="abilitySlot" id="slot4">
-                <div class="cooldownOverlay" id="cool4"></div>
-                <div class="abilityKey">4</div>
-                <div class="abilityName" id="name4">Punch</div> 
-            </div>
-        </div>
+        .statBarContainer {
+            width: 200px;
+            height: 16px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #555;
+            position: relative;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+            border-radius: 2px;
+        }
+
+        .statBarInner {
+            height: 100%;
+            transition: width 0.1s linear;
+            position: absolute;
+            border-radius: 2px;
+        }
+        .statBarLabel {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            color: #fff;
+            font-size: 10px;
+            line-height: 16px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        #hpBarInner { background: #f33; }
+        #energyBarInner { background: #00f; }
+        #xpBarInner { background: #0f0; }
+
+        #levelDisplay {
+            position: absolute;
+            left: 210px;
+            top: 0px;
+            color: #0ff;
+            font-weight: bold;
+            font-size: 14px;
+            text-shadow: 0 0 5px #0ff;
+        }
+
+        /* DPS Meter & Combo Counter Container */
+        #combatInfo {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            z-index: 10;
+            color: #fff;
+            font-family: Arial;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        #dpsMeter {
+            font-size: 18px;
+            font-weight: bold;
+            color: #f00; /* Red for damage */
+            text-shadow: 0 0 8px #f008;
+            margin-bottom: 5px;
+        }
+
+        #comboCounter {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffaa00; /* Gold/Orange for combo */
+            text-shadow: 0 0 10px #ffaa00;
+            transition: transform 0.1s ease-out;
+        }
         
-        <div id="statsMenu">
-            <h2>Character Progression</h2>
-            <p>Unspent Stat Points: <span id="statPoints">0</span></p>
-            <div class="statLine">
-                <span>Strength: <span id="menuStr">10</span></span>
-                <button class="statButton" onclick="distributeStat('strength')">+</button>
-            </div>
-            <div class="statLine">
-                <span>Speed: <span id="menuSpd">4</span></span>
-                <button class="statButton" onclick="distributeStat('speed')">+</button>
-            </div>
-            <div class="statLine">
-                <span>Defense: <span id="menuDef">0</span></span>
-                <button class="statButton" onclick="distributeStat('defense')">+</button>
-            </div>
-            <div class="statLine">
-                <span>Max HP: <span id="menuHp">100</span></span>
-                <button class="statButton" onclick="distributeStat('maxHp')">+</button>
-            </div>
-            <div class="statLine">
-                <span>Energy: <span id="menuEng">100</span></span>
-                <button class="statButton" onclick="distributeStat('energy')">+</button>
-            </div>
-            <p style="margin-top: 15px; color: #aaa;">Press 'C' to Close.</p>
-        </div>
+        /* Opponent HP Bar (Replaces NPC HP Bar) */
+        #opponentHpBar {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 200px;
+            height: 20px;
+            background: #222;
+            border: 2px solid #f0f; /* Pink/Purple for opponent */
+            display: none;
+            z-index: 10;
+        }
 
-        <div id="multiplayerHud" style="position: fixed; top: 10px; left: 240px; background: rgba(0, 0, 0, 0.7); color: white; padding: 10px; border-radius: 5px; font-family: Arial; z-index: 10;">
-            <p style="margin: 0 0 5px 0; font-size: 10px;">Your ID: <span id="my-id">...</span></p>
-            <input type="text" id="target-id" placeholder="Enter Peer ID" style="width: 100px;">
-            <button id="connect-button">Connect</button>
-            <p id="connection-status" style="margin: 5px 0 0 0; color: #ff0; font-size: 10px;">Status: Disconnected</p>
-        </div>
+        #opponentHpBarInner {
+            height: 100%;
+            width: 100%;
+            background: #f0f;
+        }
 
-        <script>
-            // ===== CANVAS & CONTEXT SETUP =====
-            const canvas = document.getElementById("gameCanvas");
-            const ctx = canvas.getContext("2d");
-            canvas.width = innerWidth;
-            canvas.height = innerHeight;
-            
-            // ===== PLAYER STATS =====
-            const player = {
-                x: 0,
-                y: 0,
-                w: 40,
-                h: 60,
-                velX: 0,
-                velY: 0,
-                facing: 1,
-                jumpCount: 0,
-                maxJumps: 2,
-                dashTime: 0,
-                dashCooldown: 0,
-                attackTime: 0,
-                attackCooldown: 0,
-                stamina: 100,
+        /* Ability Bar */
+        #abilityBar {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            background: rgba(40, 40, 40, 0.35);
+            border-top: 1px solid #b00;
+            border-bottom: 1px solid #b00;
+            padding: 4px;
+            text-align: center;
+            color: white;
+            font-family: Arial;
+            z-index: 20;
+            border-radius: 4px;
+        }
+
+        #abilityTitle {
+            font-size: 10px;
+            letter-spacing: 1px;
+            font-weight: bold;
+            margin-bottom: 2px;
+            opacity: 0.8;
+        }
+
+        .abilitySlot {
+            display: inline-block;
+            width: 40px;
+            height: 38px;
+            margin: 0 2px;
+            background: rgba(20, 20, 20, 0.55);
+            border: 1px solid #555;
+            padding: 2px;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .abilityKey {
+            font-size: 11px;
+            color: #fff;
+        }
+
+        .abilityName {
+            font-size: 8px;
+            margin-top: 1px;
+            color: #ccc;
+        }
+
+        .cooldownOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.45);
+            pointer-events: none;
+            clip-path: inset(0 0 0 0);
+            border-radius: 4px;
+        }
+        
+        /* Stats Menu Overlay */
+        #statsMenu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            background: rgba(20, 30, 40, 0.95);
+            border: 2px solid #0ff;
+            color: white;
+            padding: 20px;
+            font-family: Arial;
+            display: none; /* Hidden by default */
+            z-index: 50;
+            box-shadow: 0 0 20px #0ff8;
+        }
+        #statsMenu h2 {
+            color: #0ff;
+            margin-top: 0;
+        }
+        .statLine {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px dashed #333;
+        }
+        .statButton {
+            background: #0ff;
+            color: #111;
+            border: none;
+            padding: 2px 8px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 2px;
+        }
+        #statPoints {
+            color: #f0f;
+            font-weight: bold;
+        }
+
+        /* Low HP Overlay */
+        #lowHpOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 0, 0, 0.0); /* Start transparent */
+            pointer-events: none;
+            z-index: 5; /* Below HUD, above canvas */
+            transition: background-color 0.1s ease-out; /* Smoother flash transition */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="lowHpOverlay"></div>
+    
+    <div id="gameStatus">
+        <h2 id="statusMessage">Connecting...</h2>
+    </div>
+
+    <div id="mainHud">
+        <div id="levelDisplay">Lvl: 1</div>
+        <div class="statBarContainer">
+            <div class="statBarInner" id="hpBarInner"></div>
+            <div class="statBarLabel" id="hpLabel">HP: 100 / 100</div>
+        </div>
+        <div class="statBarContainer">
+            <div class="statBarInner" id="energyBarInner"></div>
+            <div class="statBarLabel" id="energyLabel">Energy: 100 / 100</div>
+        </div>
+        <div class="statBarContainer">
+            <div class="statBarInner" id="xpBarInner"></div>
+            <div class="statBarLabel" id="xpLabel">XP: 0 / 100 (Level 1)</div>
+        </div>
+    </div>
+
+    <div id="combatInfo">
+        <div id="dpsMeter">DPS: 0.0</div>
+        <div id="comboCounter"></div>
+    </div>
+    
+    <div id="opponentHpBar">
+        <div id="opponentHpBarInner"></div>
+    </div>
+
+    <div id="abilityBar">
+        <div id="abilityTitle">Universal: <span id="uniAbilityName">Punch</span> (LMB) </div>
+        <div class="abilitySlot" id="slot1">
+            <div class="cooldownOverlay" id="cool1"></div>
+            <div class="abilityKey">1</div>
+            <div class="abilityName" id="name1">Ability 1</div>
+        </div>
+        <div class="abilitySlot" id="slot2">
+            <div class="cooldownOverlay" id="cool2"></div>
+            <div class="abilityKey">2</div>
+            <div class="abilityName" id="name2">Ability 2</div>
+        </div>
+        <div class="abilitySlot" id="slot3">
+            <div class="cooldownOverlay" id="cool3"></div>
+            <div class="abilityKey">3</div>
+            <div class="abilityName" id="name3">Ability 3</div>
+        </div>
+        <div class="abilitySlot" id="slot4">
+            <div class="cooldownOverlay" id="cool4"></div>
+            <div class="abilityKey">4</div>
+            <div class="abilityName" id="name4">Punch</div> 
+        </div>
+    </div>
+    
+    <div id="statsMenu">
+        <h2>Character Progression</h2>
+        <p>Unspent Stat Points: <span id="statPoints">0</span></p>
+        <div class="statLine">
+            <span>Strength: <span id="menuStr">10</span></span>
+            <button class="statButton" onclick="distributeStat('strength')">+</button>
+        </div>
+        <div class="statLine">
+            <span>Speed: <span id="menuSpd">4</span></span>
+            <button class="statButton" onclick="distributeStat('speed')">+</button>
+        </div>
+        <div class="statLine">
+            <span>Defense: <span id="menuDef">0</span></span>
+            <button class="statButton" onclick="distributeStat('defense')">+</button>
+        </div>
+        <div class="statLine">
+            <span>Max HP: <span id="menuHp">100</span></span>
+            <button class="statButton" onclick="distributeStat('maxHp')">+</button>
+        </div>
+        <div class="statLine">
+            <span>Energy: <span id="menuEng">100</span></span>
+            <button class="statButton" onclick="distributeStat('energy')">+</button>
+        </div>
+        <p style="margin-top: 15px; color: #aaa;">Press 'C' to Close.</p>
+    </div>
+
+    <script>
+        // --- GAME MODE & PEERJS SETUP ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const mode = urlParams.get('mode') || 'single'; // 'single', 'host', or 'join'
+        const roomID = urlParams.get('room') || 'ROOM-A1B2C3'; // Default ID for quick match host
+        
+        const statusDisplay = document.getElementById('statusMessage');
+        let peer = null;
+        let conn = null;
+        let isOnline = (mode !== 'single');
+        let isHost = (mode === 'host');
+        let gameActive = false; // Game starts active only after connection in online mode
+        
+        // Multiplayer State (To be synced)
+        let opponentState = {
+            x: 0,
+            y: 0,
+            hp: 100,
+            maxHp: 100,
+            w: 40,
+            h: 60,
+            isBlocking: false,
+            isInvincible: false,
+            isDashing: false,
+            berserkMode: false,
+            facing: 1,
+            // Include only necessary visual/collision properties
+        };
+
+
+        // ===== CANVAS & CONTEXT SETUP =====
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = innerWidth;
+        canvas.height = innerHeight;
+        
+        // ===== PLAYER STATS =====
+        const player = {
+            x: 100, // Starting positions adjusted for player 1/2
+            y: 0,
+            w: 40,
+            h: 60,
+            velX: 0,
+            velY: 0,
+            facing: 1,
+            jumpCount: 0,
+            maxJumps: 2,
+            dashTime: 0,
+            dashCooldown: 0,
+            attackTime: 0,
+            attackCooldown: 0,
+            stamina: 100,
+            energy: 100,
+            hp: 100,
+            maxHp: 100,
+            level: 1,
+            xp: 0,
+            xpToNextLevel: 100, 
+            unspentStatPoints: 0, 
+            invincible: false,
+            berserkMode: false,
+            isBlocking: false,
+            isDashing: false,
+            hasDashHit: false,
+            stats: {
+                speed: 4,
+                strength: 10,
+                defense: 0,
                 energy: 100,
-                hp: 100,
-                maxHp: 100,
-                level: 1,
-                xp: 0,
-                xpToNextLevel: 100, 
-                unspentStatPoints: 0, 
-                invincible: false,
-                berserkMode: false,
-                isBlocking: false,
-                isDashing: false,
-                hasDashHit: false,
-                stats: {
-                    speed: 4,
-                    strength: 10,
-                    defense: 0,
-                    energy: 100,
-                    reflectDamage: 0
-                },
-                // NEW: Variables for tracking ground state and sprinting
-                onGround: false,
-                wasOnGround: false,
-                isSprinting: false,
-                justStartedSprinting: false
-            };
+                reflectDamage: 0
+            },
+            onGround: false,
+            wasOnGround: false,
+            isSprinting: false,
+            justStartedSprinting: false,
+            alive: true, // For online mode, used for game over
+            isDead: false // Alias for alive
+        };
 
-            // ===== COMBAT METRICS =====
-            const combatMetrics = {
-                totalDamage: 0,
-                damageLog: [],
-                comboCount: 0,
-                comboTimer: 0,
-                maxCombo: 0,
-                dps: 0
-            };
-            const COMBO_RESET_TIME = 90;
+        // ===== COMBAT METRICS & GAME CONSTANTS =====
+        const combatMetrics = {
+            totalDamage: 0,
+            damageLog: [],
+            comboCount: 0,
+            comboTimer: 0,
+            maxCombo: 0,
+            dps: 0
+        };
+        const COMBO_RESET_TIME = 90;
+        const GROUND_Y = canvas.height - 80;
 
-            function getXPForLevel(level) {
-                return 100 + (level - 1) * 50; 
+        function getXPForLevel(level) {
+            return 100 + (level - 1) * 50; 
+        }
+
+        // ===== CHARACTER CREATOR/BUILD SELECTION =====
+        const savedBuild = localStorage.getItem('fracture_charbuild') || 'Strength';
+        
+        const buildStats = {
+            'Strength': { str: 18, spd: 3, def: 0, maxHp: 100, abilityNames: ["Ground Smash", "Punch Combo", "Berserk Mode", "Punch"] },
+            'Speed': { str: 7, spd: 8, def: 0, maxHp: 100, abilityNames: ["Dash Burst", "Double Jump", "Blur (Invinc)", "Punch"] },
+            'Defense': { str: 10, spd: 4, def: 5, maxHp: 140, reflectDamage: 0.3, abilityNames: ["Shield Wall", "Armor Boost", "Thorns (Reflect)", "Punch"] },
+            'Energy': { str: 10, spd: 4, def: 0, maxHp: 100, energy: 150, abilityNames: ["Fireball", "Energy Beam", "Teleport", "Punch"] }
+        };
+
+        const b = buildStats[savedBuild];
+        player.stats.strength = b.str;
+        player.stats.speed = b.spd;
+        player.stats.defense = b.def;
+        player.maxHp = b.maxHp;
+        player.hp = b.maxHp;
+        player.stats.reflectDamage = b.reflectDamage || 0;
+        player.stats.energy = b.energy || 100;
+        player.energy = player.stats.energy;
+        player.xpToNextLevel = getXPForLevel(player.level);
+        
+        // Set initial position based on host/client
+        if (isOnline) {
+            player.x = isHost ? canvas.width * 0.2 : canvas.width * 0.8;
+            player.facing = isHost ? 1 : -1;
+            opponentState.x = isHost ? canvas.width * 0.8 : canvas.width * 0.2;
+            opponentState.facing = isHost ? -1 : 1;
+        }
+
+
+        document.getElementById("name1").innerText = b.abilityNames[0];
+        document.getElementById("name2").innerText = b.abilityNames[1];
+        document.getElementById("name3").innerText = b.abilityNames[2];
+        document.getElementById("name4").innerText = "Dash/Punch";
+        document.getElementById("abilityTitle").innerHTML = `${savedBuild} Build Active / **DASH (Q)** / **BLOCK (F)**`;
+
+        // ===== NPC (REPLACED BY OPPONENT IN ONLINE MODE) ===== 
+        // In online mode, the 'npc' object is completely unused. We use 'opponentState' instead.
+        const npc = {
+            x: 400,
+            y: 0,
+            w: 40,
+            h: 60,
+            hp: 300,
+            maxHp: 300,
+            alive: !isOnline, // Only alive if single player
+            xpValue: 50,
+            isAirborne: false,
+            airborneVelY: 0,
+            airborneLife: 0,
+            velX: 0,
+            hitFlashTimer: 0
+        };
+
+        // ===== INPUT & MENU =====
+        const keys = {};
+        document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+        document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+        let mouseDown = false;
+        canvas.addEventListener("mousedown", () => mouseDown = true);
+        canvas.addEventListener("mouseup", () => mouseDown = false);
+
+        let menuOpen = false;
+        document.addEventListener("keydown", (e) => {
+            if (e.key.toLowerCase() === "c") {
+                menuOpen = !menuOpen;
+                document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
+                if (menuOpen) updateStatsMenu(); 
             }
+            if (e.key.toLowerCase() === 'q' && !menuOpen) {
+                dashMove(); 
+            }
+            if (e.key.toLowerCase() === 'f' && player.stamina > 0 && !menuOpen) {
+                player.isBlocking = true;
+                if(isOnline) sendData({ type: 'STATUS', isBlocking: true });
+            }
+        });
+        document.addEventListener("keyup", (e) => {
+             if (e.key.toLowerCase() === 'f') {
+                player.isBlocking = false;
+                if(isOnline) sendData({ type: 'STATUS', isBlocking: false });
+             }
+        });
 
-            // ===== CHARACTER CREATOR/BUILD SELECTION =====
-            const savedBuild = localStorage.getItem('fracture_charbuild') || 'Strength';
+        // ===== VFX ARRAYS =====
+        const damageNumbers = [];
+        const particles = [];
+        const afterimages = []; 
+        const vfxQueue = []; 
+        let camX = 0;
+        let abilityCooldowns = [0, 0, 0, 0];
+        let screenShakeTime = 0;
+        let shakeIntensity = 0;
+
+        function triggerScreenShake(duration = 8, intensity = 6) { 
+            screenShakeTime = duration;
+            shakeIntensity = intensity;
+        }
+
+        // ===== XP & LEVEL UP (LOCAL FOR NOW) =====
+        function gainXP(amount) {
+            if (!player.alive) return;
+            player.xp += amount;
+            createDamageNumber(amount + " XP", player.x + player.w / 2, player.y - 20, "#00ff00");
             
-            const buildStats = {
-                'Strength': { str: 18, spd: 3, def: 0, maxHp: 100, abilityNames: ["Ground Smash", "Punch Combo", "Berserk Mode", "Punch"] },
-                'Speed': { str: 7, spd: 8, def: 0, maxHp: 100, abilityNames: ["Dash Burst", "Double Jump", "Blur (Invinc)", "Punch"] },
-                'Defense': { str: 10, spd: 4, def: 5, maxHp: 140, reflectDamage: 0.3, abilityNames: ["Shield Wall", "Armor Boost", "Thorns (Reflect)", "Punch"] },
-                'Energy': { str: 10, spd: 4, def: 0, maxHp: 100, energy: 150, abilityNames: ["Fireball", "Energy Beam", "Teleport", "Punch"] }
-            };
+            while (player.xp >= player.xpToNextLevel) {
+                levelUp();
+            }
+        }
 
-            const b = buildStats[savedBuild];
-            player.stats.strength = b.str;
-            player.stats.speed = b.spd;
-            player.stats.defense = b.def;
-            player.maxHp = b.maxHp;
-            player.hp = b.maxHp;
-            player.stats.reflectDamage = b.reflectDamage || 0;
-            player.stats.energy = b.energy || 100;
-            player.energy = player.stats.energy;
+        function levelUp() {
+            player.xp -= player.xpToNextLevel;
+            player.level++;
             player.xpToNextLevel = getXPForLevel(player.level);
+            player.unspentStatPoints += 3;
 
-            document.getElementById("name1").innerText = b.abilityNames[0];
-            document.getElementById("name2").innerText = b.abilityNames[1];
-            document.getElementById("name3").innerText = b.abilityNames[2];
-            document.getElementById("name4").innerText = "Dash/Punch";
-            document.getElementById("abilityTitle").innerHTML = `${savedBuild} Build Active / **DASH (Q)** / **BLOCK (F)**`;
+            player.hp = player.maxHp;
+            player.energy = player.stats.energy;
 
-            // ===== NPC ===== 
-            const npc = {
-                x: 400,
-                y: 0,
-                w: 40,
-                h: 60,
-                hp: 300,
-                maxHp: 300,
-                alive: true,
-                xpValue: 50,
-                isAirborne: false,
-                airborneVelY: 0,
-                airborneLife: 0,
-                // NEW: Physics & Visuals
-                velX: 0,
-                hitFlashTimer: 0
-            };
-            const GROUND_Y = canvas.height - 80;
+            triggerScreenShake(30, 15);
+            burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#f0f", 80, 20);
+            createDamageNumber("LEVEL UP!", player.x + player.w / 2, player.y - 40, "#f0f");
+        }
 
-            // ===== INPUT =====
-            const keys = {};
-            document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-            document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
-            let mouseDown = false;
-            canvas.addEventListener("mousedown", () => mouseDown = true);
-            canvas.addEventListener("mouseup", () => mouseDown = false);
+        function distributeStat(stat) {
+            if (player.unspentStatPoints <= 0) return;
+            player.unspentStatPoints--;
 
-            let menuOpen = false;
-            document.addEventListener("keydown", (e) => {
-                if (e.key.toLowerCase() === "c") {
-                    menuOpen = !menuOpen;
-                    document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
-                    if (menuOpen) updateStatsMenu(); 
-                }
-                if (e.key.toLowerCase() === 'q') {
-                    dashMove(); 
-                }
-                if (e.key.toLowerCase() === 'f' && player.stamina > 0) {
-                    player.isBlocking = true;
-                }
+            if (stat === 'maxHp') {
+                player.maxHp += 10;
+                player.hp += 10;
+            } else if (stat === 'energy') {
+                player.stats.energy += 5;
+                player.energy += 5;
+            } else {
+                player.stats[stat]++;
+            }
+            updateStatsMenu();
+        }
+
+        // ===== VFX HELPERS (UNMODIFIED) =====
+        function createDamageNumber(amount, x, y, color = "#ffffff") {
+            damageNumbers.push({
+                text: Math.ceil(amount).toString(),
+                x: x,
+                y: y,
+                velY: -3,
+                velX: (Math.random() - 0.5) * 0.5,
+                life: 60,
+                color: color
             });
-            document.addEventListener("keyup", (e) => {
-                 if (e.key.toLowerCase() === 'f') {
-                    player.isBlocking = false;
-                 }
-            });
+        }
 
-            // ===== VFX ARRAYS =====
-            const damageNumbers = [];
-            const particles = [];
-            const afterimages = []; 
-            const vfxQueue = []; 
-            let camX = 0;
-            let abilityCooldowns = [0, 0, 0, 0];
-            let screenShakeTime = 0;
-            let shakeIntensity = 0;
-
-            // INCREASED INTENSITY FOR HEAVIER SHAKE
-            function triggerScreenShake(duration = 8, intensity = 6) { 
-                screenShakeTime = duration;
-                shakeIntensity = intensity;
-            }
-
-            // ===== XP & LEVEL UP =====
-            function gainXP(amount) {
-                if (!player.alive) return;
-                player.xp += amount;
-                createDamageNumber(amount + " XP", player.x + player.w / 2, player.y - 20, "#00ff00");
-                
-                while (player.xp >= player.xpToNextLevel) {
-                    levelUp();
-                }
-            }
-
-            function levelUp() {
-                player.xp -= player.xpToNextLevel;
-                player.level++;
-                player.xpToNextLevel = getXPForLevel(player.level);
-                player.unspentStatPoints += 3;
-
-                player.hp = player.maxHp;
-                player.energy = player.stats.energy;
-
-                triggerScreenShake(30, 15); // HEAVY SHAKE FOR LEVEL UP
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#f0f", 80, 20); // MORE PARTICLES
-                createDamageNumber("LEVEL UP!", player.x + player.w / 2, player.y - 40, "#f0f");
-            }
-
-            function distributeStat(stat) {
-                if (player.unspentStatPoints <= 0) return;
-                player.unspentStatPoints--;
-
-                if (stat === 'maxHp') {
-                    player.maxHp += 10;
-                    player.hp += 10;
-                } else if (stat === 'energy') {
-                    player.stats.energy += 5;
-                    player.energy += 5;
-                } else {
-                    player.stats[stat]++;
-                }
-                updateStatsMenu();
-            }
-
-            // ===== VFX HELPERS =====
-            function createDamageNumber(amount, x, y, color = "#ffffff") {
-                damageNumbers.push({
-                    text: Math.ceil(amount).toString(),
-                    x: x,
-                    y: y,
-                    velY: -3,
-                    velX: (Math.random() - 0.5) * 0.5,
-                    life: 60,
-                    color: color
+        function burstParticles(x, y, color, count = 20, power = 4) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x, y,
+                    size: Math.random() * 5 + 3,
+                    velX: (Math.random() * power - power / 2),
+                    velY: (Math.random() * power - power / 2),
+                    life: 20,
+                    color
                 });
             }
+        }
+        
+        function createDustParticle(x, y, directionX) {
+            particles.push({
+                x: x + Math.random() * 10 - 5,
+                y: y,
+                size: Math.random() * 3 + 1,
+                velX: (Math.random() * 2 - 1) + directionX * 1.5,
+                velY: Math.random() * -2,
+                life: 15,
+                color: "#997755"
+            });
+        }
 
-            function spawnParticle(x, y, color) {
+        function directionalBurst(x, y, color, count, directionX, spread = 0.5) {
+            for (let i = 0; i < count; i++) {
                 particles.push({
                     x, y,
                     size: Math.random() * 4 + 2,
-                    velX: (Math.random() * 4 - 2),
-                    velY: (Math.random() * -2),
-                    life: 15,
+                    velX: (directionX * (Math.random() * 8 + 4)) + (Math.random() * 2 - 1),
+                    velY: (Math.random() * -8) + 4,
+                    life: 25,
                     color
                 });
             }
+        }
 
-            // INCREASED PARTICLE COUNT FOR BURST
-            function burstParticles(x, y, color, count = 20, power = 4) {
-                for (let i = 0; i < count; i++) {
-                    particles.push({
-                        x, y,
-                        size: Math.random() * 5 + 3,
-                        velX: (Math.random() * power - power / 2),
-                        velY: (Math.random() * power - power / 2),
-                        life: 20,
-                        color
-                    });
-                }
-            }
-            
-            // NEW: Dust Particle for movement/landing
-            function createDustParticle(x, y, directionX) {
-                particles.push({
-                    x: x + Math.random() * 10 - 5,
-                    y: y,
-                    size: Math.random() * 3 + 1,
-                    velX: (Math.random() * 2 - 1) + directionX * 1.5,
-                    velY: Math.random() * -2,
-                    life: 15,
-                    color: "#997755" // Brown/Dust color
-                });
-            }
+        function createAfterimage(x, y, w, h, color) {
+            afterimages.push({
+                x, y, w, h,
+                life: 15,
+                color
+            });
+        }
+        
+        function triggerFullFlash(color = "#ffffff", duration = 5) {
+            vfxQueue.push({ type: 'fullFlash', life: duration, color: color });
+        }
 
-            // NEW: Directional Burst (Sparks/Blood fly away from hit)
-            function directionalBurst(x, y, color, count, directionX, spread = 0.5) {
-                for (let i = 0; i < count; i++) {
-                    particles.push({
-                        x, y,
-                        size: Math.random() * 4 + 2,
-                        // Velocity biased towards directionX
-                        velX: (directionX * (Math.random() * 8 + 4)) + (Math.random() * 2 - 1), // Increased velocity
-                        velY: (Math.random() * -8) + 4, // Increased vertical velocity
-                        life: 25,
-                        color
-                    });
-                }
-            }
 
-            function createAfterimage(x, y, w, h, color) {
-                afterimages.push({
-                    x, y, w, h,
-                    life: 15,
-                    color
-                });
-            }
-            
-            // NEW: Full-Screen Flash VFX
-            function triggerFullFlash(color = "#ffffff", duration = 5) {
-                vfxQueue.push({ type: 'fullFlash', life: duration, color: color });
-            }
-
-            // ===== COMBAT SYSTEM (UPDATED FOR KNOCKBACK & VFX) =====
-            function rectCollide(a, b) {
-                return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + a.h && a.y + a.h > b.y;
-            }
-
-            function getNPCBox() {
+        // ===== COMBAT SYSTEM (MODIFIED FOR ONLINE) =====
+        function rectCollide(a, b) {
+            return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + a.h && a.y + a.h > b.y;
+        }
+        
+        // Online: Target is now the opponent
+        function getTargetBox() {
+            if (!isOnline) {
                 const ground = GROUND_Y;
                 return {
                     x: npc.x,
-                    y: npc.isAirborne ? npc.y : ground - npc.h, // Fixed hitbox for airborne
+                    y: npc.isAirborne ? npc.y : ground - npc.h,
                     w: npc.w,
                     h: npc.h
                 };
             }
+            // Online Target
+            return {
+                x: opponentState.x,
+                y: opponentState.y,
+                w: opponentState.w,
+                h: opponentState.h
+            };
+        }
 
-            function getAttackBox(customWidth) {
-                const width = customWidth || (20 + player.stats.strength * 1.5);
-                return {
-                    x: player.x + (player.facing === 1 ? player.w : -width),
-                    y: player.y,
-                    w: width,
-                    h: player.h
-                };
-            }
+        function getAttackBox(customWidth) {
+            const width = customWidth || (20 + player.stats.strength * 1.5);
+            return {
+                x: player.x + (player.facing === 1 ? player.w : -width),
+                y: player.y,
+                w: width,
+                h: player.h
+            };
+        }
 
-            // UPDATED: Added knockbackForce parameter
-            function dealDamageToNPC(amount, isAbility = false, knockbackForce = 0) {
-                let npcBox = getNPCBox();
-                let hitbox = getAttackBox();
-                let finalDmg = amount;
+        // Renamed from dealDamageToNPC to dealDamageToTarget
+        function dealDamageToTarget(amount, isAbility = false, knockbackForce = 0) {
+            const target = isOnline ? opponentState : npc;
+            let targetBox = getTargetBox();
+            let hitbox = getAttackBox();
+            let finalDmg = amount;
 
-                if (rectCollide(hitbox, npcBox) && npc.alive) {
-                    // Critical Hit
-                    let dmgColor = isAbility ? "#00ffff" : "#ffffff";
-                    let isCrit = Math.random() < 0.1;
-                    if (isCrit) {
-                        finalDmg *= 1.5;
-                        dmgColor = "#ff00ff";
-                    }
-                    if (player.berserkMode) finalDmg *= 1.25;
+            if (rectCollide(hitbox, targetBox) && target.alive) {
+                
+                let dmgColor = isAbility ? "#00ffff" : "#ffffff";
+                let isCrit = Math.random() < 0.1;
+                if (isCrit) {
+                    finalDmg *= 1.5;
+                    dmgColor = "#ff00ff";
+                }
+                if (player.berserkMode) finalDmg *= 1.25;
 
-                    npc.hp -= finalDmg;
-
-                    // --- PHYSICS: KNOCKBACK ---
-                    // Determine direction from player to NPC
-                    let knockDir = (player.x + player.w/2 < npc.x + npc.w/2) ? 1 : -1;
-                    npc.velX = knockDir * knockbackForce;
-
-                    // --- VFX: HIT FLASH ---
-                    npc.hitFlashTimer = 6; // Flash white for 6 frames
-
-                    // --- VFX: PARTICLES (Blood and Sparks) ---
-                    // Sparks fly in direction of knockback
-                    directionalBurst(npcBox.x + npcBox.w/2, npcBox.y + npcBox.h/2, "#fff", 15, knockDir); // INCREASED SPARKS
-                    // "Blood" / Energy fly up
-                    directionalBurst(npcBox.x + npcBox.w/2, npcBox.y + npcBox.h/2, "#ff0000", 10, knockDir / 4, 8); // Added knockDir for subtle direction
+                // --- ONLINE MODE DAMAGE ---
+                if (isOnline) {
+                    // Host/Client sends DAMAGE event to opponent
+                    sendData({ 
+                        type: 'DAMAGE', 
+                        amount: finalDmg, 
+                        knockbackForce: knockbackForce,
+                        knockDir: (player.x + player.w/2 < target.x + target.w/2) ? 1 : -1,
+                        isCrit: isCrit
+                    });
+                    // Skip local HP reduction on target, let opponent handle it and sync back if needed
+                    // For now, assume damage is only applied by opponent receiving DAMAGE packet.
                     
-                    // --- VFX: IMPACT RING ---
-                    vfxQueue.push({ type: 'impactRing', x: npcBox.x + npcBox.w/2, y: npcBox.y + npcBox.h/2, color: "#fff", life: 10, size: 5 });
+                    target.hp -= finalDmg; // Local prediction for smooth HP bar (will be corrected by STATE_SYNC)
 
+                } 
+                // --- SINGLE PLAYER MODE DAMAGE ---
+                else { 
+                    target.hp -= finalDmg;
+                    let knockDir = (player.x + player.w/2 < target.x + target.w/2) ? 1 : -1;
+                    target.velX = knockDir * knockbackForce;
+                    target.hitFlashTimer = 6;
+                }
+                
+                // --- VISUAL EFFECTS (Always trigger locally) ---
+                let knockDir = (player.x + player.w/2 < target.x + target.w/2) ? 1 : -1; // Recalculate knockDir for visuals
+                directionalBurst(targetBox.x + targetBox.w/2, targetBox.y + targetBox.h/2, "#fff", 15, knockDir);
+                directionalBurst(targetBox.x + targetBox.w/2, targetBox.y + targetBox.h/2, "#ff0000", 10, knockDir / 4, 8);
+                vfxQueue.push({ type: 'impactRing', x: targetBox.x + targetBox.w/2, y: targetBox.y + targetBox.h/2, color: "#fff", life: 10, size: 5 });
 
-                    // --- METRICS ---
-                    combatMetrics.totalDamage += finalDmg;
-                    combatMetrics.damageLog.push({ time: Date.now(), damage: finalDmg });
-                    combatMetrics.comboCount++;
-                    combatMetrics.comboTimer = COMBO_RESET_TIME;
-                    combatMetrics.maxCombo = Math.max(combatMetrics.maxCombo, combatMetrics.comboCount);
+                // --- METRICS ---
+                combatMetrics.totalDamage += finalDmg;
+                combatMetrics.damageLog.push({ time: Date.now(), damage: finalDmg });
+                combatMetrics.comboCount++;
+                combatMetrics.comboTimer = COMBO_RESET_TIME;
+                combatMetrics.maxCombo = Math.max(combatMetrics.maxCombo, combatMetrics.comboCount);
 
-                    document.getElementById('comboCounter').style.transform = 'scale(1.2)';
-                    setTimeout(() => {
-                        document.getElementById('comboCounter').style.transform = 'scale(1.0)';
-                    }, 50);
+                document.getElementById('comboCounter').style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    document.getElementById('comboCounter').style.transform = 'scale(1.0)';
+                }, 50);
 
-                    if (isAbility) triggerScreenShake(15, 10); // HEAVY SHAKE
-                    else triggerScreenShake(8, 4); // MEDIUM SHAKE
+                if (isAbility) triggerScreenShake(15, 10);
+                else triggerScreenShake(8, 4);
 
-                    createDamageNumber(finalDmg, npcBox.x + npcBox.w / 2, npcBox.y, dmgColor);
-                    document.getElementById("npcHpBar").style.display = "block";
-                    
-                    if (npc.hp <= 0 && npc.alive) {
-                        npc.alive = false;
-                        gainXP(npc.xpValue);
-                        combatMetrics.comboCount = 0;
-                        
-                        // Death Explosion
-                        burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#f00", 80, 15); // MORE PARTICLES
-                        triggerScreenShake(20, 15); // HEAVY SHAKE
-                        triggerFullFlash("#ffffff", 5); // KILL IMPACT FRAME
-                    }
+                createDamageNumber(finalDmg, targetBox.x + targetBox.w / 2, targetBox.y, dmgColor);
+                document.getElementById("opponentHpBar").style.display = "block";
+                
+                // --- DEATH CHECK ---
+                if (!isOnline && target.hp <= 0 && target.alive) {
+                    target.alive = false;
+                    gainXP(target.xpValue);
+                    combatMetrics.comboCount = 0;
+                    burstParticles(target.x + target.w / 2, target.y + target.h / 2, "#f00", 80, 15);
+                    triggerScreenShake(20, 15);
+                    triggerFullFlash("#ffffff", 5);
+                }
+                if (isOnline && target.hp <= 0 && !target.isDead) { // Check opponent local prediction
+                    // Opponent death is confirmed via STATE_SYNC, but local prediction helps responsiveness
                 }
             }
-            
-            function dealDamageToPlayer(amount) {
-                if (player.invincible) return;
+        }
+        
+        function dealDamageToPlayer(amount, npcDir) {
+            if (player.invincible) return;
 
-                let incomingDmg = amount;
-                
-                // Determine direction for particle effect
-                let npcDir = (player.x + player.w/2 < npc.x + npc.w/2) ? 1 : -1; 
-                
-                if (player.isBlocking) {
-                    incomingDmg *= 0.1;
-                    createDamageNumber("Block!", player.x + player.w / 2, player.y - 10, "#888");
-                    // Spark on shield hit
-                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#00ccff", 10, -npcDir); // Particles away from NPC
+            let incomingDmg = amount;
+            
+            if (player.isBlocking) {
+                incomingDmg *= 0.1;
+                createDamageNumber("Block!", player.x + player.w / 2, player.y - 10, "#888");
+                directionalBurst(player.x + player.w/2, player.y + player.h/2, "#00ccff", 10, -npcDir);
+            } else {
+                triggerScreenShake(10, 5);
+                directionalBurst(player.x + player.w/2, player.y + player.h/2, "#ffaa00", 15, -npcDir);
+            }
+
+            incomingDmg = incomingDmg - player.stats.defense;
+            if (incomingDmg < 1) incomingDmg = 1;
+
+            if (player.stats.reflectDamage > 0) {
+                let reflectedDmg = incomingDmg * player.stats.reflectDamage;
+                // In online mode, reflected damage must be sent as a new DAMAGE packet to opponent
+                if (isOnline) {
+                    sendData({ 
+                        type: 'DAMAGE', 
+                        amount: reflectedDmg, 
+                        knockbackForce: 2,
+                        knockDir: -npcDir,
+                        isCrit: false
+                    });
                 } else {
-                    triggerScreenShake(10, 5); // Shake when player gets hit
-                    // NEW: Player Hit Particles (Blood/Impact)
-                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#ffaa00", 15, -npcDir); // Yellow/Orange hit particles away from NPC
+                    dealDamageToTarget(reflectedDmg, true, 2); 
                 }
+                createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", (isOnline ? opponentState.x : npc.x) + 20, (isOnline ? opponentState.y : npc.y) - 10, "#00ff00");
+            }
 
-                incomingDmg = incomingDmg - player.stats.defense;
-                if (incomingDmg < 1) incomingDmg = 1;
-
-                if (player.stats.reflectDamage > 0) {
-                    let reflectedDmg = incomingDmg * player.stats.reflectDamage;
-                    dealDamageToNPC(reflectedDmg, true, 2); 
-                    createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", npc.x + npc.w / 2, npc.y - 10, "#00ff00");
-                }
-
-                player.hp -= incomingDmg;
-                if (player.hp < 0) player.hp = 0;
-                
-                // NEW: Small knockback to player when hit (if not blocking)
-                if (!player.isBlocking) {
-                    player.x += -npcDir * 10;
-                    player.velX = -npcDir * 5;
-                }
+            player.hp -= incomingDmg;
+            if (player.hp < 0) player.hp = 0;
+            
+            if (!player.isBlocking) {
+                player.x += -npcDir * 10;
+                player.velX = -npcDir * 5;
             }
             
+            if (player.hp <= 0 && player.alive) {
+                player.alive = false;
+                player.isDead = true;
+                if(isOnline) sendData({ type: 'DEATH' }); // Notify opponent of death
+                handleGameOver('DEFEAT');
+            }
+        }
+        
+        // Single Player Auto-Attack Loop
+        if (!isOnline) {
             setInterval(() => {
                 if (npc.alive && !menuOpen) {
                     if (Math.abs(player.x - npc.x) < 100) {
-                        dealDamageToPlayer(15);
+                        // NPC attack
+                        let npcDir = (player.x + player.w/2 < npc.x + npc.w/2) ? 1 : -1; 
+                        dealDamageToPlayer(15, npcDir);
                     }
                 }
                 if (!npc.alive) {
                     npc.hp = npc.maxHp;
                     npc.alive = true;
-                    document.getElementById("npcHpBar").style.display = "none";
+                    document.getElementById("opponentHpBar").style.display = "none";
                     npc.x = 400; // Reset position
                 }
             }, 2000);
+        }
+
+        // ===================== ABILITIES =====================
+        function getMyState() {
+            return {
+                x: player.x,
+                y: player.y,
+                hp: player.hp,
+                maxHp: player.maxHp,
+                isDead: player.isDead,
+                isBlocking: player.isBlocking,
+                isInvincible: player.invincible,
+                isDashing: player.isDashing,
+                berserkMode: player.berserkMode,
+                facing: player.facing
+            };
+        }
+
+        function syncPlayerState(type) {
+            if (!isOnline || !conn || !conn.open) return;
+            // Only sync essential position data for movement
+            if (type === 'MOVE' || type === 'DASH') {
+                sendData({
+                    type: 'POS',
+                    x: player.x,
+                    y: player.y,
+                    facing: player.facing,
+                    isDashing: player.isDashing
+                });
+            }
+            // Sync status data for VFX/Health bar
+            else if (type === 'STATUS_SYNC') {
+                 sendData({ 
+                    type: 'STATUS',
+                    hp: player.hp,
+                    maxHp: player.maxHp,
+                    isDead: player.isDead,
+                    isBlocking: player.isBlocking,
+                    isInvincible: player.invincible,
+                    berserkMode: player.berserkMode
+                });
+            }
+        }
 
 
-            // ===================== ABILITIES (UPDATED PUNCH) =====================
-            function universalPunch() {
-                if (player.attackCooldown <= 0) {
-                    player.attackTime = 10;
-                    player.attackCooldown = 20;
-                    let damage = player.stats.strength * 1.5; 
-                    let moveType = 'Punch';
-                    
-                    const onGround = player.y + player.h >= GROUND_Y;
-                    let knockback = 4; // Standard Knockback
-                    
-                    if (!onGround) {
-                        if (player.velY < 0) {
-                            damage *= 1.8;
-                            moveType = 'Uppercut';
-                            knockback = 1; // Less horizontal, more vertical (logic handled in hit block)
-                        } else if (player.velY > 0) {
-                            damage *= 2.2;
-                            moveType = 'Downslam';
-                            knockback = 0;
-                        }
+        // Universal Punch (Modified to use dealDamageToTarget)
+        function universalPunch() {
+            if (player.attackCooldown <= 0 && player.alive) {
+                player.attackTime = 10;
+                player.attackCooldown = 20;
+                let damage = player.stats.strength * 1.5; 
+                let moveType = 'Punch';
+                
+                const onGround = player.y + player.h >= GROUND_Y;
+                let knockback = 4;
+                
+                if (!onGround) {
+                    if (player.velY < 0) {
+                        damage *= 1.8;
+                        moveType = 'Uppercut';
+                        knockback = 1;
+                    } else if (player.velY > 0) {
+                        damage *= 2.2;
+                        moveType = 'Downslam';
+                        knockback = 0;
                     }
+                }
 
-                    // Passing knockback here
-                    dealDamageToNPC(damage, false, knockback);
-                    
-                    let npcBox = getNPCBox();
+                dealDamageToTarget(damage, false, knockback);
+                
+                // Single Player (NPC) Knockup/Slam Logic
+                if (!isOnline) {
+                    let npcBox = getTargetBox();
                     let hitbox = getAttackBox();
 
                     if (rectCollide(hitbox, npcBox) && npc.alive) {
                         if (moveType === 'Uppercut') {
                             vfxQueue.push({ type: 'shockwave', x: npc.x + npc.w / 2, y: npc.y + npc.h / 2, color: "#ffffff", life: 15, radius: 10, maxRadius: 150 });
-                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#fff", 80, 15); // MORE PARTICLES
-                            triggerScreenShake(15, 8); // HEAVY SHAKE
+                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#fff", 80, 15);
+                            triggerScreenShake(15, 8);
 
                             npc.isAirborne = true;
                             npc.airborneVelY = -25;
                             npc.airborneLife = 30;
-                            npc.velX = 0; // Stop horizontal movement for uppercut
+                            npc.velX = 0;
                             
                             player.velY = -15; 
                             player.jumpCount = player.maxJumps; 
                         } else if (moveType === 'Downslam') {
                             vfxQueue.push({ type: 'shockwave', x: npc.x + npc.w / 2, y: GROUND_Y, color: "#ff0000", life: 30, radius: 20, maxRadius: 800 });
-                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#ff0000", 120, 20); // MORE PARTICLES
-                            triggerScreenShake(30, 20); // HEAVY SHAKE
+                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#ff0000", 120, 20);
+                            triggerScreenShake(30, 20);
 
                             npc.isAirborne = false; 
                             npc.airborneLife = 0;
                             npc.y = GROUND_Y - npc.h;
-                            npc.velX = 0; // Stop horizontal sliding
+                            npc.velX = 0;
                             
                             vfxQueue.push({ type: 'impactFlash', x: npc.x + npc.w / 2, y: GROUND_Y, color: "#ffaa00", life: 10 });
 
@@ -795,230 +939,412 @@
                     }
                 }
             }
+        }
 
 
-            // UNIVERSAL DASH 
-            function dashMove() {
-                if (abilityCooldowns[3] > 0 || player.stamina < 30 || player.isDashing) return;
-                
-                player.stamina -= 30;
-                abilityCooldowns[3] = 70;
-                player.dashTime = 15;
-                player.isDashing = true; 
-                player.hasDashHit = false;
-                player.velX = player.facing * 18;
-                burstParticles(player.x, player.y + player.h / 2, "#4aff00", 30, 8); // MORE PARTICLES
-                
-                const interval = setInterval(() => {
-                    if (player.isDashing) {
-                        createAfterimage(player.x, player.y, player.w, player.h, "#00ff0055");
-                    } else {
-                        clearInterval(interval);
-                    }
-                }, 40);
-            }
-
-
-            // --- SPEED BUILD ABILITIES --- 
-            function speed_ability1() { } 
-
-            function speed_ability2() { // Double Jump
-                if (abilityCooldowns[1] > 0) return;
-                abilityCooldowns[1] = 90;
-                player.jumpCount = 0;
-                player.velY = -12;
-                burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3); // UPDATED TO BURST
-            }
-
-            function speed_ability3() { // Blur
-                if (abilityCooldowns[2] > 0 || player.energy < 20) return;
-                player.energy -= 20;
-                abilityCooldowns[2] = 180;
-                player.invincible = true;
-                triggerScreenShake(15, 10); // HEAVY SHAKE
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 50, 15); // MORE PARTICLES
-                setTimeout(() => {
-                    player.invincible = false;
-                }, 1000);
-            }
-
-            // --- STRENGTH BUILD ABILITIES --- 
-            function strength_ability1() { // Ground Smash
-                if (abilityCooldowns[0] > 0 || player.energy < 30) return;
-                player.energy -= 30;
-                abilityCooldowns[0] = 90;
-                let dmg = player.stats.strength * 2.5;
-                dealDamageToNPC(dmg, true, 20); // BIG KNOCKBACK
-                burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12); // MORE PARTICLES
-                vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500 });
-                triggerScreenShake(20, 15); // HEAVY SHAKE
-            }
-
-            function strength_ability2() { // Punch Combo
-                if (abilityCooldowns[1] > 0 || player.stamina < 40) return;
-                player.stamina -= 40;
-                abilityCooldowns[1] = 60;
-                let hits = 4;
-                let dmgPerHit = player.stats.strength * 0.7;
-                for (let i = 0; i < hits; i++) {
-                    setTimeout(() => {
-                        // Small knockback per hit, last hit could be larger but we'll keep it consistent
-                        dealDamageToNPC(dmgPerHit, true, 3); 
-                        createAfterimage(player.x + player.w, player.y, 10, player.h, "#ff880055");
-                    }, i * 100);
+        // UNIVERSAL DASH 
+        function dashMove() {
+            if (abilityCooldowns[3] > 0 || player.stamina < 30 || player.isDashing || !player.alive) return;
+            
+            player.stamina -= 30;
+            abilityCooldowns[3] = 70;
+            player.dashTime = 15;
+            player.isDashing = true; 
+            player.hasDashHit = false;
+            player.velX = player.facing * 18;
+            burstParticles(player.x, player.y + player.h / 2, "#4aff00", 30, 8);
+            
+            const interval = setInterval(() => {
+                if (player.isDashing) {
+                    createAfterimage(player.x, player.y, player.w, player.h, "#00ff0055");
+                } else {
+                    clearInterval(interval);
                 }
-            }
+            }, 40);
+            
+            if(isOnline) syncPlayerState('DASH');
+        }
 
-            function strength_ability3() { // Berserk Mode
-                if (abilityCooldowns[2] > 0 || player.energy < 50) return;
-                player.energy -= 50;
-                abilityCooldowns[2] = 240;
-                player.berserkMode = true;
-                player.stats.defense = -5;
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff5555", 80, 20); // MORE PARTICLES
-                triggerScreenShake(25, 18); // HEAVY SHAKE
+
+        // --- SPEED BUILD ABILITIES --- 
+        function speed_ability2() { // Double Jump
+            if (abilityCooldowns[1] > 0 || !player.alive) return;
+            abilityCooldowns[1] = 90;
+            player.jumpCount = 0;
+            player.velY = -12;
+            burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3);
+            if(isOnline) sendData({ type: 'VFX', name: 'DoubleJump', x: player.x, y: player.y });
+        }
+
+        function speed_ability3() { // Blur
+            if (abilityCooldowns[2] > 0 || player.energy < 20 || !player.alive) return;
+            player.energy -= 20;
+            abilityCooldowns[2] = 180;
+            player.invincible = true;
+            triggerScreenShake(15, 10);
+            burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 50, 15);
+            if(isOnline) sendData({ type: 'STATUS', isInvincible: true });
+            setTimeout(() => {
+                player.invincible = false;
+                if(isOnline) sendData({ type: 'STATUS', isInvincible: false });
+            }, 1000);
+        }
+
+        // --- STRENGTH BUILD ABILITIES --- 
+        function strength_ability1() { // Ground Smash
+            if (abilityCooldowns[0] > 0 || player.energy < 30 || !player.alive) return;
+            player.energy -= 30;
+            abilityCooldowns[0] = 90;
+            let dmg = player.stats.strength * 2.5;
+            dealDamageToTarget(dmg, true, 20); // BIG KNOCKBACK
+            burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12);
+            vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500 });
+            triggerScreenShake(20, 15);
+            if(isOnline) sendData({ type: 'VFX', name: 'GroundSmash', x: player.x, y: GROUND_Y });
+        }
+
+        function strength_ability2() { // Punch Combo
+            if (abilityCooldowns[1] > 0 || player.stamina < 40 || !player.alive) return;
+            player.stamina -= 40;
+            abilityCooldowns[1] = 60;
+            let hits = 4;
+            let dmgPerHit = player.stats.strength * 0.7;
+            for (let i = 0; i < hits; i++) {
                 setTimeout(() => {
-                    player.berserkMode = false;
-                    player.stats.defense = buildStats[savedBuild].def;
-                    burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#55ff55", 50, 12);
-                }, 4000);
+                    dealDamageToTarget(dmgPerHit, true, 3); 
+                    createAfterimage(player.x + player.w, player.y, 10, player.h, "#ff880055");
+                }, i * 100);
             }
+        }
 
-            // --- DEFENSE BUILD ABILITIES ---
-            function defense_ability1() { // Shield Wall
-                if (abilityCooldowns[0] > 0 || player.energy < 15) return;
-                player.energy -= 15;
-                abilityCooldowns[0] = 120;
-                player.stats.defense += 10;
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#0000ff", 30, 8); // MORE PARTICLES
-                setTimeout(() => {
-                    player.stats.defense -= 10;
-                }, 2000);
-            }
+        function strength_ability3() { // Berserk Mode
+            if (abilityCooldowns[2] > 0 || player.energy < 50 || !player.alive) return;
+            player.energy -= 50;
+            abilityCooldowns[2] = 240;
+            player.berserkMode = true;
+            player.stats.defense = -5;
+            burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff5555", 80, 20);
+            triggerScreenShake(25, 18);
+            if(isOnline) sendData({ type: 'STATUS', berserkMode: true });
+            setTimeout(() => {
+                player.berserkMode = false;
+                player.stats.defense = buildStats[savedBuild].def;
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#55ff55", 50, 12);
+                if(isOnline) sendData({ type: 'STATUS', berserkMode: false });
+            }, 4000);
+        }
 
-            function defense_ability2() { // Armor Boost
-                if (abilityCooldowns[1] > 0 || player.energy < 20) return;
-                player.energy -= 20;
-                abilityCooldowns[1] = 180;
-                let heal = player.maxHp * 0.15;
-                player.hp = Math.min(player.maxHp, player.hp + heal);
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ff00", 40, 10); // MORE PARTICLES
-                createDamageNumber(heal.toFixed(0) + " Heal", player.x + player.w / 2, player.y - 20, "#00ff00");
-            }
+        // --- DEFENSE BUILD ABILITIES ---
+        function defense_ability1() { // Shield Wall
+            if (abilityCooldowns[0] > 0 || player.energy < 15 || !player.alive) return;
+            player.energy -= 15;
+            abilityCooldowns[0] = 120;
+            player.stats.defense += 10;
+            burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#0000ff", 30, 8);
+            if(isOnline) sendData({ type: 'VFX', name: 'ShieldWall', x: player.x, y: player.y });
+            setTimeout(() => {
+                player.stats.defense -= 10;
+            }, 2000);
+        }
 
-            function defense_ability3() { // Thorns
-                if (abilityCooldowns[2] > 0 || player.energy < 10) return;
-                player.energy -= 10;
-                abilityCooldowns[2] = 180;
-                player.stats.reflectDamage = 0.5;
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#8888ff", 25, 6);
-                setTimeout(() => {
-                    player.stats.reflectDamage = 0.3;
-                }, 3000);
-            }
+        function defense_ability2() { // Armor Boost
+            if (abilityCooldowns[1] > 0 || player.energy < 20 || !player.alive) return;
+            player.energy -= 20;
+            abilityCooldowns[1] = 180;
+            let heal = player.maxHp * 0.15;
+            player.hp = Math.min(player.maxHp, player.hp + heal);
+            burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ff00", 40, 10);
+            createDamageNumber(heal.toFixed(0) + " Heal", player.x + player.w / 2, player.y - 20, "#00ff00");
+            if(isOnline) syncPlayerState('STATUS_SYNC'); // Sync health
+        }
 
-            // --- ENERGY BUILD ABILITIES --- 
-            function energy_ability1() { // Fireball
-                if (abilityCooldowns[0] > 0 || player.energy < 25) return;
-                player.energy -= 25;
-                abilityCooldowns[0] = 90;
-                let dmg = player.stats.energy * 0.8;
-                dealDamageToNPC(dmg, true, 10); // Moderate knockback
-                vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: npc.x, targetY: npc.y, color: "#ff6600", life: 20 });
-                burstParticles(npc.x, npc.y + npc.h / 2, "#ff6600", 40, 10); // MORE PARTICLES
-            }
+        function defense_ability3() { // Thorns
+            if (abilityCooldowns[2] > 0 || player.energy < 10 || !player.alive) return;
+            player.energy -= 10;
+            abilityCooldowns[2] = 180;
+            player.stats.reflectDamage = 0.5;
+            burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#8888ff", 25, 6);
+            setTimeout(() => {
+                player.stats.reflectDamage = 0.3;
+            }, 3000);
+        }
 
-            function energy_ability2() { // Energy Beam
-                if (abilityCooldowns[1] > 0 || player.energy < 40) return;
-                player.energy -= 40;
-                abilityCooldowns[1] = 150;
-                let dmg = player.stats.energy * 1.5;
-                dealDamageToNPC(dmg, true, 25); // MASSIVE KNOCKBACK
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); // MORE PARTICLES
-                triggerScreenShake(20, 12); // HEAVY SHAKE
-            }
+        // --- ENERGY BUILD ABILITIES --- 
+        function energy_ability1() { // Fireball
+            if (abilityCooldowns[0] > 0 || player.energy < 25 || !player.alive) return;
+            player.energy -= 25;
+            abilityCooldowns[0] = 90;
+            let dmg = player.stats.energy * 0.8;
+            dealDamageToTarget(dmg, true, 10); // Moderate knockback
+            vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: opponentState.x, targetY: opponentState.y, color: "#ff6600", life: 20 });
+            burstParticles(opponentState.x, opponentState.y + opponentState.h / 2, "#ff6600", 40, 10);
+            if(isOnline) sendData({ type: 'VFX', name: 'Fireball', x: player.x, y: player.y });
+        }
 
-            function energy_ability3() { // Teleport
-                if (abilityCooldowns[2] > 0 || player.energy < 15) return;
-                player.energy -= 15;
-                abilityCooldowns[2] = 60;
-                createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99");
-                burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); // MORE PARTICLES
-                player.x += player.facing * 150;
-                createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99");
-                burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); // MORE PARTICLES
-            }
+        function energy_ability2() { // Energy Beam
+            if (abilityCooldowns[1] > 0 || player.energy < 40 || !player.alive) return;
+            player.energy -= 40;
+            abilityCooldowns[1] = 150;
+            let dmg = player.stats.energy * 1.5;
+            dealDamageToTarget(dmg, true, 25); // MASSIVE KNOCKBACK
+            burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15);
+            triggerScreenShake(20, 12);
+            if(isOnline) sendData({ type: 'VFX', name: 'EnergyBeam', x: player.x, y: player.y });
+        }
 
-            // ===================== INPUT HANDLER =====================
-            function ability1() {
-                if (menuOpen) return;
-                if (savedBuild === 'Strength') strength_ability1();
-                else if (savedBuild === 'Defense') defense_ability1();
-                else if (savedBuild === 'Energy') energy_ability1();
-            }
+        function energy_ability3() { // Teleport
+            if (abilityCooldowns[2] > 0 || player.energy < 15 || !player.alive) return;
+            player.energy -= 15;
+            abilityCooldowns[2] = 60;
+            createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99");
+            burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6);
+            player.x += player.facing * 150;
+            createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99");
+            burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6);
+            if(isOnline) syncPlayerState('MOVE');
+        }
 
-            function ability2() {
-                if (menuOpen) return;
-                if (savedBuild === 'Speed') speed_ability2();
-                else if (savedBuild === 'Strength') strength_ability2();
-                else if (savedBuild === 'Defense') defense_ability2();
-                else if (savedBuild === 'Energy') energy_ability2();
-            }
+        // ===================== INPUT HANDLER =====================
+        function ability1() {
+            if (menuOpen) return;
+            if (savedBuild === 'Strength') strength_ability1();
+            else if (savedBuild === 'Defense') defense_ability1();
+            else if (savedBuild === 'Energy') energy_ability1();
+        }
 
-            function ability3() {
-                if (menuOpen) return;
-                if (savedBuild === 'Speed') speed_ability3();
-                else if (savedBuild === 'Strength') strength_ability3();
-                else if (savedBuild === 'Defense') defense_ability3();
-                else if (savedBuild === 'Energy') energy_ability3();
-            }
+        function ability2() {
+            if (menuOpen) return;
+            if (savedBuild === 'Speed') speed_ability2();
+            else if (savedBuild === 'Strength') strength_ability2();
+            else if (savedBuild === 'Defense') defense_ability2();
+            else if (savedBuild === 'Energy') energy_ability2();
+        }
 
-            document.addEventListener("keydown", (e) => {
-                if (e.key === "1") ability1();
-                if (e.key === "2") ability2();
-                if (e.key === "3") ability3();
-            });
+        function ability3() {
+            if (menuOpen) return;
+            if (savedBuild === 'Speed') speed_ability3();
+            else if (savedBuild === 'Strength') strength_ability3();
+            else if (savedBuild === 'Defense') defense_ability3();
+            else if (savedBuild === 'Energy') energy_ability3();
+        }
 
-            function updateAbilityCooldowns() {
-                for (let i = 0; i < abilityCooldowns.length; i++) {
-                    if (abilityCooldowns[i] > 0) abilityCooldowns[i]--;
-                }
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "1") ability1();
+            if (e.key === "2") ability2();
+            if (e.key === "3") ability3();
+        });
+
+
+        // ===================== PEERJS LOGIC =====================
+
+        function initPeer() {
+            // Hide single-player NPC HP bar
+            document.getElementById("opponentHpBar").style.display = isOnline ? 'block' : 'none';
+            document.getElementById('statusMessage').textContent = isOnline ? 'Connecting...' : 'Single Player Mode';
+            document.getElementById('gameStatus').style.display = isOnline ? 'flex' : 'none';
+            
+            if (!isOnline) {
+                gameActive = true;
+                return;
             }
             
-            function updateCombatMetrics() {
-                if (combatMetrics.comboTimer > 0) {
-                    combatMetrics.comboTimer--;
-                } else if (combatMetrics.comboCount > 0) {
-                    combatMetrics.comboCount = 0;
+            const peerId = isHost ? roomID : `CLIENT-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+            peer = new Peer(peerId);
+
+            peer.on('open', (id) => {
+                console.log('My Peer ID is: ' + id);
+                if (isHost) {
+                    statusDisplay.textContent = `Hosting room: ${roomID}. Waiting for opponent...`;
+                } else {
+                    statusDisplay.textContent = `Attempting to join room: ${roomID}...`;
+                    connectToHost(roomID);
                 }
-                const threeSecondsAgo = Date.now() - 3000;
-                combatMetrics.damageLog = combatMetrics.damageLog.filter(entry => entry.time > threeSecondsAgo);
-                const recentDamage = combatMetrics.damageLog.reduce((sum, entry) => sum + entry.damage, 0);
-                combatMetrics.dps = recentDamage / 3.0;
+            });
+
+            peer.on('error', (err) => {
+                console.error('PeerJS Error:', err);
+                statusDisplay.textContent = `Error: ${err.type}. Check console.`;
+            });
+
+            if (isHost) {
+                peer.on('connection', (c) => {
+                    if (conn) { c.close(); return; }
+                    conn = c;
+                    setupConnection(conn);
+                    statusDisplay.textContent = 'Opponent connected! Game starting...';
+                    gameActive = true;
+                    document.getElementById('gameStatus').style.display = 'none';
+                    // Host sends initial game configuration/state/position
+                    sendData({ 
+                        type: 'START_GAME', 
+                        isHost: true, 
+                        opponentState: getMyState() 
+                    });
+                });
             }
+        }
 
-            // ===== UPDATE LOOP =====
-            function update() {
-                if (menuOpen) return;
+        function connectToHost(hostId) {
+            conn = peer.connect(hostId);
+            setupConnection(conn);
+        }
 
-                // --- UPDATE NPC PHYSICS (KNOCKBACK) ---
+        function setupConnection(c) {
+            conn.on('open', () => {
+                statusDisplay.textContent = isHost ? 'Connection established with opponent.' : 'Joined host. Waiting for game start...';
+                if(!isHost) {
+                    sendData({ 
+                        type: 'READY_TO_START',
+                        playerState: getMyState() // Send initial local state
+                    });
+                }
+            });
+
+            conn.on('data', receiveData);
+            
+            conn.on('close', () => {
+                statusDisplay.textContent = 'Connection lost. Opponent disconnected.';
+                if(player.alive) {
+                    handleGameOver('VICTORY_DISCONNECT');
+                }
+            });
+        }
+
+        function sendData(data) {
+            if (conn && conn.open) {
+                conn.send(data);
+            }
+        }
+
+        function receiveData(data) {
+            if (data.type !== 'POS') console.log('Received:', data);
+            
+            if (!player.alive && data.type !== 'RESTART') return;
+
+            switch (data.type) {
+                case 'START_GAME':
+                    // Client receives this from Host
+                    opponentState = data.opponentState;
+                    gameActive = true;
+                    document.getElementById('gameStatus').style.display = 'none';
+                    break;
+                case 'READY_TO_START':
+                    // Host receives this from Client
+                    opponentState = data.playerState;
+                    // Host sends client its state in response to READY
+                    sendData({ 
+                        type: 'STATUS', 
+                        hp: player.hp, 
+                        maxHp: player.maxHp 
+                    });
+                    break;
+                case 'POS':
+                    // Opponent moved, update position locally
+                    opponentState.x = data.x;
+                    opponentState.y = data.y;
+                    opponentState.facing = data.facing;
+                    opponentState.isDashing = data.isDashing;
+                    break;
+                case 'STATUS':
+                    // Opponent sent general status update
+                    if (data.hp !== undefined) opponentState.hp = data.hp;
+                    if (data.maxHp !== undefined) opponentState.maxHp = data.maxHp;
+                    if (data.isBlocking !== undefined) opponentState.isBlocking = data.isBlocking;
+                    if (data.isInvincible !== undefined) opponentState.isInvincible = data.isInvincible;
+                    if (data.berserkMode !== undefined) opponentState.berserkMode = data.berserkMode;
+                    break;
+                case 'DAMAGE':
+                    // Opponent hit me, apply damage locally
+                    const incomingDmg = data.amount;
+                    const knockDir = data.knockDir;
+                    
+                    dealDamageToPlayer(incomingDmg, knockDir); // Applies damage, block, reflection, etc.
+                    
+                    // Respond with an updated STATUS (health sync)
+                    syncPlayerState('STATUS_SYNC');
+                    
+                    // Apply knockback visual
+                    player.x += -knockDir * data.knockbackForce * 2;
+                    player.velX = -knockDir * data.knockbackForce * 1.5;
+                    
+                    // Play hit flash visual
+                    // (Note: No opponent hitFlashTimer needed since we draw opponent based on state)
+                    break;
+                case 'VFX':
+                    // Opponent used an ability, play the visual effect on my screen
+                    handleOpponentVFX(data.name, data.x, data.y);
+                    break;
+                case 'DEATH':
+                    // Opponent told me they died
+                    opponentState.isDead = true;
+                    handleGameOver('VICTORY');
+                    break;
+            }
+        }
+        
+        function handleOpponentVFX(name, x, y) {
+            console.log(`Opponent used ${name} at ${x}, ${y}`);
+            switch(name) {
+                case 'DoubleJump':
+                    burstParticles(x + opponentState.w/2, y + opponentState.h, "#0ff", 10, 3);
+                    break;
+                case 'GroundSmash':
+                    burstParticles(x + opponentState.w / 2, GROUND_Y, "#ff0000", 50, 12);
+                    vfxQueue.push({ type: 'shockwave', x: x + opponentState.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500 });
+                    break;
+                case 'Fireball':
+                    vfxQueue.push({ 
+                        type: 'projectileTrail', 
+                        x: x + opponentState.w / 2, 
+                        y: y + opponentState.h / 2, 
+                        targetX: player.x + player.w / 2, 
+                        targetY: player.y + player.h / 2, 
+                        color: "#ff6600", 
+                        life: 20 
+                    });
+                    break;
+                // Add cases for other abilities (e.g., Blur, EnergyBeam, ShieldWall)
+            }
+        }
+        
+        function handleGameOver(result) {
+            gameActive = false;
+            document.getElementById('gameStatus').style.display = 'flex';
+            if (result === 'VICTORY') {
+                statusDisplay.textContent = 'VICTORY! Opponent Defeated.';
+            } else if (result === 'DEFEAT') {
+                statusDisplay.textContent = 'DEFEAT! Try Again.';
+            } else if (result === 'VICTORY_DISCONNECT') {
+                statusDisplay.textContent = 'VICTORY! Opponent Disconnected.';
+            }
+        }
+
+
+        // ===================== GAME LOOP & UPDATES =====================
+
+        function update() {
+            if (menuOpen || !gameActive) return;
+
+            // --- ONLINE MODE: Use opponentState for the 'target' ---
+            if (isOnline) {
+                // If opponent is dashing but POS is not updating, clear dash state locally (prediction correction)
+                if (opponentState.isDashing && Math.abs(opponentState.x - player.x) > canvas.width * 0.9) {
+                     opponentState.isDashing = false;
+                }
+            }
+            // --- SINGLE PLAYER MODE: NPC logic ---
+            else {
                 if (npc.alive) {
-                    // Apply velocity
                     npc.x += npc.velX;
-                    // Apply friction
                     npc.velX *= 0.9;
                     if (Math.abs(npc.velX) < 0.5) npc.velX = 0;
-                    
-                    // Hit Flash Timer
                     if (npc.hitFlashTimer > 0) npc.hitFlashTimer--;
-
-                    // Keep inside arena (roughly)
                     if (npc.x < -200) npc.x = -200;
                     if (npc.x > canvas.width + 200) npc.x = canvas.width + 200;
                 }
 
                 if (npc.isAirborne) {
-                    const currentGroundY = canvas.height - 80;
+                    const currentGroundY = GROUND_Y;
                     npc.airborneVelY += 1.2; 
                     npc.y += npc.airborneVelY;
                     npc.airborneLife--;
@@ -1029,570 +1355,484 @@
                          vfxQueue.push({ type: 'impactFlash', x: npc.x + npc.w / 2, y: currentGroundY, color: "#ffaa00", life: 10 });
                     }
                 }
-
-                // --- PLAYER MOVEMENT & PHYSICS ---
-                
-                // Track previous ground state for landing dust
-                player.wasOnGround = player.onGround;
-                const oldVelY = player.velY; // Store vertical velocity before gravity is applied
-                
-                // Gravity (Adjusted for better jump arc)
-                player.velY += 1.0; // Increased gravity from 0.8 to 1.0
-                
-                // Drag in the air
-                if (!player.onGround) player.velX *= 0.98;
-
-                if (keys["a"]) player.facing = -1;
-                if (keys["d"]) player.facing = 1;
-                
-                let moveSpeed = player.stats.speed;
-                const isMovingHorizontally = keys["a"] || keys["d"];
-
-                // Determine if sprinting
-                const isSprintingAttempt = keys["shift"] && player.stamina > 0 && isMovingHorizontally && !player.isBlocking;
-                const wasSprinting = player.isSprinting;
-                player.isSprinting = isSprintingAttempt && player.onGround && !player.isDashing;
-                player.justStartedSprinting = player.isSprinting && !wasSprinting;
-
-
-                if (player.isDashing) {
-                } else if (player.isBlocking) {
-                    moveSpeed *= 0.3;
-                } else if (player.isSprinting) {
-                    moveSpeed *= 1.7;
-                }
-                
-                if (player.isBlocking && player.stamina > 0) {
-                    player.stamina -= 0.8;
-                } else if (player.isSprinting) {
-                    player.stamina -= 0.5;
-                } else {
-                    player.stamina += 0.4;
-                }
-                player.stamina = Math.max(0, Math.min(100, player.stamina));
-                player.energy += 0.5;
-                player.energy = Math.min(player.stats.energy, player.energy);
-
-
-                if (!player.isDashing) { 
-                    if (keys["a"]) player.velX = -moveSpeed;
-                    else if (keys["d"]) player.velX = moveSpeed;
-                    else player.velX *= 0.8;
-                } else {
-                    player.velX *= 0.95;
-                }
-                
-                // --- MOVEMENT VFX ---
-                
-                // Sprint Dust Burst (Start of Sprint)
-                if (player.justStartedSprinting) {
-                    for(let i = 0; i < 15; i++) {
-                        createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
-                    }
-                }
-                
-                // Sprint Dust Trail
-                if (player.isSprinting && Math.random() < 0.4) { // 40% chance per frame to spawn a particle
-                    createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
-                }
-
-
-                if (keys[" "] && player.jumpCount < player.maxJumps) {
-                    player.velY = -12;
-                    burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3); // UPDATED TO BURST
-                    player.jumpCount++;
-                    keys[" "] = false;
-                    player.onGround = false; // Player is no longer on the ground when jumping
-                }
-
-                player.x += player.velX;
-                player.y += player.velY;
-                const ground = GROUND_Y;
-                
-                
-                if (player.y + player.h >= ground) {
-                    // Landing Dust
-                    if (!player.wasOnGround && oldVelY > 5) { // Check if we just landed and were falling fast enough
-                        for(let i = 0; i < 20; i++) {
-                            createDustParticle(player.x + player.w / 2, ground, 0);
-                        }
-                        triggerScreenShake(3, 2);
-                    }
-
-                    player.y = ground - player.h;
-                    player.velY = 0;
-                    player.jumpCount = 0;
-                    player.onGround = true; // Player is on the ground
-                } else {
-                    player.onGround = false; // Player is in the air
-                }
-                
-                // --- DASHING & COMBAT ---
-
-                if (player.isDashing && npc.alive && !player.hasDashHit) {
-                    let dashHitbox = { x: player.x, y: player.y, w: player.w, h: player.h };
-                    let npcBox = getNPCBox();
-
-                    if (rectCollide(dashHitbox, npcBox)) {
-                        const dashPunchDamage = player.stats.strength * 2.5;
-                        dealDamageToNPC(dashPunchDamage, true, 12); // Heavy Knockback on Dash
-
-                        player.velX = 0;
-                        player.isDashing = false; 
-                        player.dashTime = 0; 
-                        player.hasDashHit = true;
-
-                        player.attackTime = 10;
-                        triggerScreenShake(15, 8); // HEAVY SHAKE
-                    }
-                }
-                
-                if (player.dashTime > 0) player.dashTime--;
-                
-                if (player.isDashing && player.dashTime <= 0) {
-                    player.isDashing = false;
-                    player.velX *= 0.8; 
-                }
-
-                if (player.dashCooldown > 0) player.dashCooldown--;
-
-                if (mouseDown) universalPunch();
-                if (player.attackTime > 0) player.attackTime--;
-                if (player.attackCooldown > 0) player.attackCooldown--;
-
-                // --- VFX UPDATES ---
-                for (let i = particles.length - 1; i >= 0; i--) {
-                    let p = particles[i];
-                    p.x += p.velX;
-                    p.y += p.velY;
-                    p.life--;
-                    p.size *= 0.92;
-                    if (p.life <= 0) particles.splice(i, 1);
-                }
-                for (let i = damageNumbers.length - 1; i >= 0; i--) {
-                    let d = damageNumbers[i];
-                    d.y += d.velY;
-                    d.x += d.velX;
-                    d.velY *= 0.96;
-                    d.life--;
-                    if (d.life <= 0) damageNumbers.splice(i, 1);
-                }
-                for (let i = afterimages.length - 1; i >= 0; i--) { 
-                    afterimages[i].life--;
-                    if (afterimages[i].life <= 0) afterimages.splice(i, 1);
-                }
-                for (let i = vfxQueue.length - 1; i >= 0; i--) {
-                    vfxQueue[i].life--;
-                    if (vfxQueue[i].life <= 0) vfxQueue.splice(i, 1);
-                }
-
-
-                updateAbilityCooldowns();
-                updateCombatMetrics(); 
-
-                if (screenShakeTime > 0) {
-                    screenShakeTime--;
-                }
-                camX += ((player.x - canvas.width / 2) - camX) * 0.08;
-
-                updateMainHUD();
-                updateCooldownUI();
-                updateCombatUI(); 
             }
 
-            // ===== UI UPDATES (MODIFIED FOR LOW HP FLASHING) =====
-            function updateMainHUD() {
-                const hpRatio = player.hp / player.maxHp;
-                document.getElementById("hpBarInner").style.width = (hpRatio * 100) + "%";
-                document.getElementById("hpLabel").innerText = `HP: ${parseInt(player.hp)} / ${player.maxHp}`;
-                
-                const energyRatio = player.energy / player.stats.energy;
-                document.getElementById("energyBarInner").style.width = (energyRatio * 100) + "%";
-                document.getElementById("energyLabel").innerText = `Energy: ${parseInt(player.energy)} / ${player.stats.energy}`;
 
-                const xpRatio = player.xp / player.xpToNextLevel;
-                document.getElementById("xpBarInner").style.width = (xpRatio * 100) + "%";
-                document.getElementById("xpLabel").innerText = `XP: ${parseInt(player.xp)} / ${player.xpToNextLevel}`;
-                document.getElementById("levelDisplay").innerText = `Lvl: ${player.level}`;
-                
-                if (npc.alive) {
-                    document.getElementById("npcHpBarInner").style.width = (npc.hp / npc.maxHp * 100) + "%";
-                }
+            // --- PLAYER MOVEMENT & PHYSICS ---
+            player.wasOnGround = player.onGround;
+            const oldVelY = player.velY;
+            player.velY += 1.0;
+            if (!player.onGround) player.velX *= 0.98;
 
-                // NEW: Low HP Red Tint (Flashing)
-                let redTintOpacity = 0;
-                if (hpRatio < 0.3) {
-                    // 1. Base Opacity: increases from 0.0 to 0.08 as HP drops from 30% to 0%
-                    let baseOpacity = (1 - (hpRatio / 0.3)) * 0.08; 
-                    
-                    // 2. Flashing Component (Sine wave based on time for smooth, steady flash)
-                    // 0.008 controls the speed of the flash
-                    const flashComponent = (Math.sin(Date.now() * 0.008) + 1) / 2;
-                    
-                    // 3. Combine: Opacity oscillates around the base opacity. Max is 0.08 + 0.05 = 0.13
-                    redTintOpacity = baseOpacity + (flashComponent * 0.05); 
-                }
-                document.getElementById('lowHpOverlay').style.backgroundColor = `rgba(255, 0, 0, ${redTintOpacity.toFixed(3)})`;
-            }
+            if (keys["a"]) player.facing = -1;
+            if (keys["d"]) player.facing = 1;
+            
+            let moveSpeed = player.stats.speed;
+            const isMovingHorizontally = keys["a"] || keys["d"];
 
-            function updateCooldownUI() {
-                const maxCooldowns = [90, 90, 180, 70]; 
-                for (let i = 0; i < 3; i++) {
-                    const cooldown = abilityCooldowns[i];
-                    const max = maxCooldowns[i] || 1;
-                    let ratio = cooldown / max;
-                    if (ratio < 0) ratio = 0;
-                    document.getElementById("cool" + (i + 1)).style.clipPath = `inset(${ratio * 100}% 0 0 0)`;
-                }
-                const dashCooldown = abilityCooldowns[3];
-                const dashMax = maxCooldowns[3];
-                const dashRatio = dashCooldown / dashMax;
-                document.getElementById("cool4").style.clipPath = `inset(${dashRatio * 100}% 0 0 0)`;
+            const isSprintingAttempt = keys["shift"] && player.stamina > 0 && isMovingHorizontally && !player.isBlocking;
+            const wasSprinting = player.isSprinting;
+            player.isSprinting = isSprintingAttempt && player.onGround && !player.isDashing;
+            player.justStartedSprinting = player.isSprinting && !wasSprinting;
+
+
+            if (player.isDashing) {
+            } else if (player.isBlocking) {
+                moveSpeed *= 0.3;
+            } else if (player.isSprinting) {
+                moveSpeed *= 1.7;
             }
             
-            function updateStatsMenu() {
-                document.getElementById('statPoints').innerText = player.unspentStatPoints;
-                document.getElementById('menuStr').innerText = player.stats.strength;
-                document.getElementById('menuSpd').innerText = player.stats.speed;
-                document.getElementById('menuDef').innerText = player.stats.defense;
-                document.getElementById('menuHp').innerText = player.maxHp;
-                document.getElementById('menuEng').innerText = player.stats.energy;
+            if (player.isBlocking && player.stamina > 0) {
+                player.stamina -= 0.8;
+            } else if (player.isSprinting) {
+                player.stamina -= 0.5;
+            } else {
+                player.stamina += 0.4;
+            }
+            player.stamina = Math.max(0, Math.min(100, player.stamina));
+            player.energy += 0.5;
+            player.energy = Math.min(player.stats.energy, player.energy);
 
-                const buttons = document.querySelectorAll('#statsMenu .statButton');
-                buttons.forEach(btn => {
-                    btn.style.display = player.unspentStatPoints > 0 ? 'inline-block' : 'none';
-                });
+
+            if (!player.isDashing) { 
+                if (keys["a"]) player.velX = -moveSpeed;
+                else if (keys["d"]) player.velX = moveSpeed;
+                else player.velX *= 0.8;
+            } else {
+                player.velX *= 0.95;
+            }
+            
+            if (player.justStartedSprinting) {
+                for(let i = 0; i < 15; i++) {
+                    createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
+                }
+            }
+            
+            if (player.isSprinting && Math.random() < 0.4) {
+                createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
             }
 
-            function updateCombatUI() {
-                document.getElementById('dpsMeter').innerText = `DPS: ${combatMetrics.dps.toFixed(1)}`;
-                const comboDisplay = document.getElementById('comboCounter');
-                if (combatMetrics.comboCount > 1) {
-                    comboDisplay.innerText = `${combatMetrics.comboCount}x COMBO`;
-                    comboDisplay.style.opacity = 1;
-                } else {
-                    comboDisplay.innerText = '';
-                    comboDisplay.style.opacity = 0;
-                }
+
+            if (keys[" "] && player.jumpCount < player.maxJumps) {
+                player.velY = -12;
+                burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3);
+                player.jumpCount++;
+                keys[" "] = false;
+                player.onGround = false;
             }
 
-            // ===== DRAW LOOP (MODIFIED FOR PARALLAX AND FULL FLASH VFX) =====
-            function draw() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                let shakeOffsetX = 0;
-                let shakeOffsetY = 0;
-                if (screenShakeTime > 0) {
-                    // Random offset based on intensity
-                    shakeOffsetX = (Math.random() - 0.5) * shakeIntensity * 2;
-                    shakeOffsetY = (Math.random() - 0.5) * shakeIntensity * 2;
-                }
-
-                const GROUND_Y_GLOBAL = canvas.height - 80;
-
-                // --- 1. DRAW PARALLAX BACKGROUND (Affected by shake, manually offset by camX) ---
-                ctx.save(); 
-                ctx.translate(shakeOffsetX, shakeOffsetY);
-                
-                // Farthest Layer (0.1) - Dark Sky/Deep Background
-                const FAR_BG_FACTOR = 0.1;
-                ctx.fillStyle = "#000033"; 
-                let farX = (-camX * FAR_BG_FACTOR) % canvas.width;
-                ctx.fillRect(farX - canvas.width, 0, canvas.width, GROUND_Y_GLOBAL);
-                ctx.fillRect(farX, 0, canvas.width, GROUND_Y_GLOBAL);
-
-                // Mid Layer (0.3) - Blocky Structures (repeats every 500 units)
-                const MID_BG_FACTOR = 0.3;
-                ctx.fillStyle = "#0a0a55";
-                let midX = (-camX * MID_BG_FACTOR) % 500; 
-                for (let i = -3; i < canvas.width / 500 + 3; i++) {
-                    ctx.fillRect(midX + i * 500, GROUND_Y_GLOBAL - 80, 50, 80);
-                    ctx.fillRect(midX + i * 500 + 100, GROUND_Y_GLOBAL - 150, 80, 150);
-                }
-                
-                // Close Layer (0.6) - Pillars/Trees (repeats every 400 units)
-                const CLOSE_BG_FACTOR = 0.6;
-                ctx.fillStyle = "#151577";
-                let closeX = (-camX * CLOSE_BG_FACTOR) % 400; 
-                for (let i = -5; i < canvas.width / 400 + 5; i++) {
-                    ctx.fillRect(closeX + i * 400, GROUND_Y_GLOBAL - 40, 30, 40);
-                }
-                
-                ctx.restore(); // End Parallax Draw
-
-                // --- 2. DRAW FOREGROUND (Affected by shake and full -camX translation) ---
-                ctx.save(); 
-                ctx.translate(shakeOffsetX, shakeOffsetY);
-                ctx.translate(-camX, 0); // Camera translation for foreground elements
-
-                // GROUND (Moves 1:1 with camera)
-                ctx.fillStyle = "#222";
-                ctx.fillRect(camX - 1000, GROUND_Y_GLOBAL, canvas.width + 2000, 80); // Draw a very long ground bar
-                
-                // AFTERIMAGES
-                for (let img of afterimages) {
-                    ctx.fillStyle = img.color;
-                    ctx.globalAlpha = img.life / 15 * 0.5;
-                    ctx.fillRect(img.x, img.y, img.w, img.h);
-                }
-                ctx.globalAlpha = 1;
-
-                // NPC
-                if (npc.alive) {
-                    const npcDrawY = npc.isAirborne ? npc.y : GROUND_Y_GLOBAL - npc.h;
-                    
-                    // --- VFX: HIT FLASH DRAWING ---
-                    if (npc.hitFlashTimer > 0) {
-                        ctx.fillStyle = "#ffffff"; // Pure white flash
-                        ctx.shadowBlur = 20;
-                        ctx.shadowColor = "white";
-                    } else {
-                        ctx.fillStyle = "#f33"; // Normal Color
-                        ctx.shadowBlur = 0;
+            player.x += player.velX;
+            player.y += player.velY;
+            
+            
+            if (player.y + player.h >= GROUND_Y) {
+                if (!player.wasOnGround && oldVelY > 5) {
+                    for(let i = 0; i < 20; i++) {
+                        createDustParticle(player.x + player.w / 2, GROUND_Y, 0);
                     }
-
-                    ctx.fillRect(npc.x, npcDrawY, npc.w, npc.h);
-                    ctx.shadowBlur = 0; // Reset shadow
-                    
-                    if(npc.isAirborne) {
-                        ctx.strokeStyle = "#ffffff";
-                        ctx.lineWidth = 1;
-                        ctx.globalAlpha = 0.5;
-                        ctx.beginPath();
-                        ctx.moveTo(npc.x + npc.w/2, npcDrawY);
-                        ctx.lineTo(npc.x + npc.w/2, GROUND_Y_GLOBAL - npc.h);
-                        ctx.stroke();
-                        ctx.globalAlpha = 1;
-                    }
+                    triggerScreenShake(3, 2);
                 }
 
-                // PLAYER
-                ctx.fillStyle = "#4af";
-                if (player.invincible) {
+                player.y = GROUND_Y - player.h;
+                player.velY = 0;
+                player.jumpCount = 0;
+                player.onGround = true;
+            } else {
+                player.onGround = false;
+            }
+            
+            // --- ONLINE SYNC: Send position on every update frame if moving or facing changed
+            if (isOnline && (Math.abs(player.velX) > 0.1 || player.y + player.h < GROUND_Y || player.facing !== (keys["d"] ? 1 : (keys["a"] ? -1 : player.facing)) || player.isDashing)) {
+                syncPlayerState('MOVE');
+            }
+            // --- DASHING & COMBAT ---
+            if (player.isDashing && player.alive && !player.hasDashHit) {
+                let dashHitbox = { x: player.x, y: player.y, w: player.w, h: player.h };
+                let targetBox = getTargetBox();
+
+                if (rectCollide(dashHitbox, targetBox) && (isOnline ? !opponentState.isDead : npc.alive)) {
+                    const dashPunchDamage = player.stats.strength * 2.5;
+                    dealDamageToTarget(dashPunchDamage, true, 12);
+
+                    player.velX = 0;
+                    player.isDashing = false; 
+                    player.dashTime = 0; 
+                    player.hasDashHit = true;
+                    player.attackTime = 10;
+                    triggerScreenShake(15, 8);
+                    
+                    if(isOnline) syncPlayerState('DASH'); // Force sync end of dash
+                }
+            }
+            
+            if (player.dashTime > 0) player.dashTime--;
+            
+            if (player.isDashing && player.dashTime <= 0) {
+                player.isDashing = false;
+                player.velX *= 0.8;
+                if(isOnline) syncPlayerState('DASH'); // Force sync end of dash
+            }
+
+            if (player.dashCooldown > 0) player.dashCooldown--;
+
+            if (mouseDown && player.alive) universalPunch();
+            if (player.attackTime > 0) player.attackTime--;
+            if (player.attackCooldown > 0) player.attackCooldown--;
+
+            // --- VFX UPDATES ---
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.velX;
+                p.y += p.velY;
+                p.life--;
+                p.size *= 0.92;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+            for (let i = damageNumbers.length - 1; i >= 0; i--) {
+                let d = damageNumbers[i];
+                d.y += d.velY;
+                d.x += d.velX;
+                d.velY *= 0.96;
+                d.life--;
+                if (d.life <= 0) damageNumbers.splice(i, 1);
+            }
+            for (let i = afterimages.length - 1; i >= 0; i--) { 
+                afterimages[i].life--;
+                if (afterimages[i].life <= 0) afterimages.splice(i, 1);
+            }
+            for (let i = vfxQueue.length - 1; i >= 0; i--) {
+                vfxQueue[i].life--;
+                if (vfxQueue[i].life <= 0) vfxQueue.splice(i, 1);
+            }
+
+
+            updateAbilityCooldowns();
+            updateCombatMetrics(); 
+
+            if (screenShakeTime > 0) {
+                screenShakeTime--;
+            }
+            camX += ((player.x - canvas.width / 2) - camX) * 0.08;
+
+            updateMainHUD();
+            updateCooldownUI();
+            updateCombatUI(); 
+        }
+
+        function updateAbilityCooldowns() {
+            const maxCooldowns = [90, 90, 180, 70]; 
+            for (let i = 0; i < abilityCooldowns.length; i++) {
+                if (abilityCooldowns[i] > 0) abilityCooldowns[i]--;
+            }
+        }
+        
+        function updateCombatMetrics() {
+            if (combatMetrics.comboTimer > 0) {
+                combatMetrics.comboTimer--;
+            } else if (combatMetrics.comboCount > 0) {
+                combatMetrics.comboCount = 0;
+            }
+            const threeSecondsAgo = Date.now() - 3000;
+            combatMetrics.damageLog = combatMetrics.damageLog.filter(entry => entry.time > threeSecondsAgo);
+            const recentDamage = combatMetrics.damageLog.reduce((sum, entry) => sum + entry.damage, 0);
+            combatMetrics.dps = recentDamage / 3.0;
+        }
+
+
+        // ===== UI UPDATES =====
+        function updateMainHUD() {
+            const hpRatio = player.hp / player.maxHp;
+            document.getElementById("hpBarInner").style.width = (hpRatio * 100) + "%";
+            document.getElementById("hpLabel").innerText = `HP: ${parseInt(player.hp)} / ${player.maxHp}`;
+            
+            const energyRatio = player.energy / player.stats.energy;
+            document.getElementById("energyBarInner").style.width = (energyRatio * 100) + "%";
+            document.getElementById("energyLabel").innerText = `Energy: ${parseInt(player.energy)} / ${player.stats.energy}`;
+
+            const xpRatio = player.xp / player.xpToNextLevel;
+            document.getElementById("xpBarInner").style.width = (xpRatio * 100) + "%";
+            document.getElementById("xpLabel").innerText = `XP: ${parseInt(player.xp)} / ${player.xpToNextLevel}`;
+            document.getElementById("levelDisplay").innerText = `Lvl: ${player.level}`;
+            
+            // Online/NPC HP Bar
+            const target = isOnline ? opponentState : npc;
+            if (target.alive || isOnline) {
+                const targetHpRatio = target.hp / target.maxHp;
+                document.getElementById("opponentHpBarInner").style.width = (targetHpRatio * 100) + "%";
+            }
+
+            let redTintOpacity = 0;
+            if (hpRatio < 0.3) {
+                let baseOpacity = (1 - (hpRatio / 0.3)) * 0.08; 
+                const flashComponent = (Math.sin(Date.now() * 0.008) + 1) / 2;
+                redTintOpacity = baseOpacity + (flashComponent * 0.05); 
+            }
+            document.getElementById('lowHpOverlay').style.backgroundColor = `rgba(255, 0, 0, ${redTintOpacity.toFixed(3)})`;
+        }
+
+        function updateCooldownUI() {
+            const maxCooldowns = [90, 90, 180, 70]; 
+            for (let i = 0; i < abilityCooldowns.length; i++) {
+                const cooldown = abilityCooldowns[i];
+                const max = maxCooldowns[i] || 1;
+                let ratio = cooldown / max;
+                if (ratio < 0) ratio = 0;
+                document.getElementById("cool" + (i + 1)).style.clipPath = `inset(${ratio * 100}% 0 0 0)`;
+            }
+            const dashCooldown = abilityCooldowns[3];
+            const dashMax = maxCooldowns[3];
+            const dashRatio = dashCooldown / dashMax;
+            document.getElementById("cool4").style.clipPath = `inset(${dashRatio * 100}% 0 0 0)`;
+        }
+        
+        function updateStatsMenu() {
+            document.getElementById('statPoints').innerText = player.unspentStatPoints;
+            document.getElementById('menuStr').innerText = player.stats.strength;
+            document.getElementById('menuSpd').innerText = player.stats.speed;
+            document.getElementById('menuDef').innerText = player.stats.defense;
+            document.getElementById('menuHp').innerText = player.maxHp;
+            document.getElementById('menuEng').innerText = player.stats.energy;
+
+            const buttons = document.querySelectorAll('#statsMenu .statButton');
+            buttons.forEach(btn => {
+                btn.style.display = player.unspentStatPoints > 0 ? 'inline-block' : 'none';
+            });
+        }
+
+        function updateCombatUI() {
+            document.getElementById('dpsMeter').innerText = `DPS: ${combatMetrics.dps.toFixed(1)}`;
+            const comboDisplay = document.getElementById('comboCounter');
+            if (combatMetrics.comboCount > 1) {
+                comboDisplay.innerText = `${combatMetrics.comboCount}x COMBO`;
+                comboDisplay.style.opacity = 1;
+            } else {
+                comboDisplay.innerText = '';
+                comboDisplay.style.opacity = 0;
+            }
+        }
+
+        // ===== DRAW LOOP (MODIFIED TO DRAW OPPONENT) =====
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let shakeOffsetX = 0;
+            let shakeOffsetY = 0;
+            if (screenShakeTime > 0) {
+                shakeOffsetX = (Math.random() - 0.5) * shakeIntensity * 2;
+                shakeOffsetY = (Math.random() - 0.5) * shakeIntensity * 2;
+            }
+
+            // --- 1. DRAW PARALLAX BACKGROUND (Affected by shake, manually offset by camX) ---
+            ctx.save(); 
+            ctx.translate(shakeOffsetX, shakeOffsetY);
+            
+            const FAR_BG_FACTOR = 0.1;
+            ctx.fillStyle = "#000033"; 
+            let farX = (-camX * FAR_BG_FACTOR) % canvas.width;
+            ctx.fillRect(farX - canvas.width, 0, canvas.width, GROUND_Y);
+            ctx.fillRect(farX, 0, canvas.width, GROUND_Y);
+
+            const MID_BG_FACTOR = 0.3;
+            ctx.fillStyle = "#0a0a55";
+            let midX = (-camX * MID_BG_FACTOR) % 500; 
+            for (let i = -3; i < canvas.width / 500 + 3; i++) {
+                ctx.fillRect(midX + i * 500, GROUND_Y - 80, 50, 80);
+                ctx.fillRect(midX + i * 500 + 100, GROUND_Y - 150, 80, 150);
+            }
+            
+            const CLOSE_BG_FACTOR = 0.6;
+            ctx.fillStyle = "#151577";
+            let closeX = (-camX * CLOSE_BG_FACTOR) % 400; 
+            for (let i = -5; i < canvas.width / 400 + 5; i++) {
+                ctx.fillRect(closeX + i * 400, GROUND_Y - 40, 30, 40);
+            }
+            
+            ctx.restore();
+
+            // --- 2. DRAW FOREGROUND (Affected by shake and full -camX translation) ---
+            ctx.save(); 
+            ctx.translate(shakeOffsetX, shakeOffsetY);
+            ctx.translate(-camX, 0);
+
+            // GROUND
+            ctx.fillStyle = "#222";
+            ctx.fillRect(camX - 1000, GROUND_Y, canvas.width + 2000, 80); 
+            
+            // AFTERIMAGES
+            for (let img of afterimages) {
+                ctx.fillStyle = img.color;
+                ctx.globalAlpha = img.life / 15 * 0.5;
+                ctx.fillRect(img.x, img.y, img.w, img.h);
+            }
+            ctx.globalAlpha = 1;
+
+            // OPPONENT / NPC
+            const target = isOnline ? opponentState : npc;
+            if (target.alive || (isOnline && !target.isDead)) {
+                const targetDrawY = isOnline ? target.y : (target.isAirborne ? target.y : GROUND_Y - target.h);
+                
+                // --- OPPONENT VFX ---
+                ctx.fillStyle = isOnline ? "#f0f" : "#f33"; // Pink/Purple for opponent
+                if (target.isInvincible) {
                     ctx.fillStyle = "#00ffff";
                     ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.3;
-                } else if (player.berserkMode) {
+                } else if (target.berserkMode) {
                     ctx.fillStyle = "#ff5555";
-                } else if (player.isBlocking) {
+                } else if (target.isBlocking) {
                     ctx.fillStyle = "#aaa";
-                } else if (player.isDashing) {
-                    ctx.fillStyle = "#4aff00";
+                } else if (target.isDashing) {
+                     ctx.fillStyle = "#4aff00";
+                } else if (!isOnline && npc.hitFlashTimer > 0) { // Single player hit flash
+                    ctx.fillStyle = "#ffffff";
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = "white";
                 }
-                ctx.fillRect(player.x, player.y, player.w, player.h);
-                ctx.globalAlpha = 1;
 
-                if (player.isBlocking) {
+                ctx.fillRect(target.x, targetDrawY, target.w, target.h);
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1;
+                
+                // Opponent Blocking Shield
+                if (target.isBlocking) {
                     ctx.strokeStyle = "#ffffff";
                     ctx.lineWidth = 3;
                     ctx.globalAlpha = 0.8;
                     ctx.beginPath();
-                    if (player.facing === 1) {
-                         ctx.arc(player.x + player.w, player.y + player.h / 2, 25, Math.PI / 2, -Math.PI / 2);
+                    if (target.facing === 1) {
+                         ctx.arc(target.x + target.w, target.y + target.h / 2, 25, Math.PI / 2, -Math.PI / 2);
                     } else {
-                         ctx.arc(player.x, player.y + player.h / 2, 25, -Math.PI / 2, Math.PI / 2);
+                         ctx.arc(target.x, target.y + target.h / 2, 25, -Math.PI / 2, Math.PI / 2);
                     }
                     ctx.stroke();
                     ctx.globalAlpha = 1;
                 }
+            }
 
 
-                // ATTACK HITBOX
-                if (player.attackTime > 0) {
-                    let hitbox = getAttackBox();
-                    ctx.fillStyle = "rgba(255,255,255,0.3)";
-                    ctx.fillRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
+            // PLAYER
+            ctx.fillStyle = "#4af";
+            if (player.invincible) {
+                ctx.fillStyle = "#00ffff";
+                ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.3;
+            } else if (player.berserkMode) {
+                ctx.fillStyle = "#ff5555";
+            } else if (player.isBlocking) {
+                ctx.fillStyle = "#aaa";
+            } else if (player.isDashing) {
+                ctx.fillStyle = "#4aff00";
+            }
+            if (player.isDead) ctx.globalAlpha = 0.3;
+
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.globalAlpha = 1;
+
+            if (player.isBlocking) {
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 3;
+                ctx.globalAlpha = 0.8;
+                ctx.beginPath();
+                if (player.facing === 1) {
+                     ctx.arc(player.x + player.w, player.y + player.h / 2, 25, Math.PI / 2, -Math.PI / 2);
+                } else {
+                     ctx.arc(player.x, player.y + player.h / 2, 25, -Math.PI / 2, Math.PI / 2);
                 }
-
-                // PARTICLES
-                for (let p of particles) {
-                    ctx.fillStyle = p.color;
-                    ctx.fillRect(p.x, p.y, p.size, p.size);
-                }
-
-                // COMPLEX VFX
-                for (let vfx of vfxQueue) {
-                    ctx.globalAlpha = vfx.life / (vfx.life > 20 ? 30 : 10);
-                    if (vfx.type === 'shockwave') {
-                        const maxLife = 30;
-                        const currentRadius = vfx.radius + (vfx.maxRadius - vfx.radius) * (1 - vfx.life / maxLife);
-                        ctx.strokeStyle = vfx.color;
-                        ctx.lineWidth = 4;
-                        ctx.beginPath();
-                        ctx.arc(vfx.x, vfx.y, currentRadius, Math.PI, 0); 
-                        ctx.stroke();
-                    } else if (vfx.type === 'projectileTrail') {
-                        ctx.fillStyle = vfx.color;
-                        const maxLife = 20;
-                        const progress = 1 - vfx.life / maxLife;
-                        const currentX = vfx.x + (vfx.targetX - vfx.x) * progress;
-                        const currentY = vfx.y + (GROUND_Y_GLOBAL - npc.h / 2 - vfx.y) * progress;
-                        ctx.beginPath();
-                        ctx.arc(currentX, currentY, 10, 0, Math.PI * 2);
-                        ctx.fill();
-                    } else if (vfx.type === 'impactFlash') {
-                         ctx.fillStyle = vfx.color;
-                         const size = 60 * (1 - vfx.life / 10);
-                         ctx.beginPath();
-                         ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2);
-                         ctx.fill();
-                    } else if (vfx.type === 'impactRing') { // NEW RING EFFECT
-                         ctx.strokeStyle = vfx.color;
-                         ctx.lineWidth = 3;
-                         const size = vfx.size + (50 * (1 - vfx.life / 10)); // Expands
-                         ctx.beginPath();
-                         ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2);
-                         ctx.stroke();
-                    }
-                }
+                ctx.stroke();
                 ctx.globalAlpha = 1;
-
-                // DAMAGE NUMBERS
-                ctx.font = "bold 18px Arial";
-                ctx.textAlign = "center";
-                for (let d of damageNumbers) {
-                    const alpha = d.life / 60;
-                    ctx.fillStyle = d.color;
-                    ctx.globalAlpha = alpha;
-                    ctx.strokeStyle = "#000000";
-                    ctx.lineWidth = 3;
-                    ctx.strokeText(d.text, d.x, d.y);
-                    ctx.fillText(d.text, d.x, d.y);
-                }
-                ctx.globalAlpha = 1;
-
-                ctx.restore(); // End Foreground Draw
-                
-                // --- 3. DRAW SCREEN VFX (No translation, no shake) ---
-                for (let i = vfxQueue.length - 1; i >= 0; i--) {
-                    const vfx = vfxQueue[i];
-                    if (vfx.type === 'fullFlash') {
-                        ctx.save();
-                        ctx.globalAlpha = vfx.life / 5; // Quick fade
-                        ctx.fillStyle = vfx.color;
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.restore();
-                    }
-                }
             }
 
-            function loop() {
-                update();
-                draw();
-                requestAnimationFrame(loop);
-            }
-            loop();
-            
-            // ===================== MULTIPLAYER (PEERJS) LOGIC =====================
-            
-            const myIdEl = document.getElementById('my-id');
-            const targetIdInput = document.getElementById('target-id');
-            const connectButton = document.getElementById('connect-button');
-            const statusEl = document.getElementById('connection-status');
-            let peer = null;
-            let conn = null;
-            
-            // NOTE: You will need a placeholder object for the opponent, 
-            // e.g., const opponent = { x: 0, y: 0, w: 40, h: 60, facing: 1 };
 
-            // Function to initialize PeerJS
-            function initializePeer() {
-                // Generate a random ID for this session
-                const uniqueId = 'fracture_game_' + Math.random().toString(36).substr(2, 9);
-                
-                // Create the Peer object
-                peer = new Peer(uniqueId, {
-                    // Using PeerJS's public cloud server for ease of use
-                    host: '0.peerjs.com', 
-                    port: 443, 
-                    secure: true
-                });
-                
-                peer.on('open', (id) => {
-                    myIdEl.innerText = id;
-                    statusEl.innerText = 'Status: Ready';
-                    statusEl.style.color = '#0f0';
-                    console.log('My Peer ID is: ' + id);
-                });
-
-                peer.on('error', (err) => {
-                    statusEl.innerText = 'Status: Error';
-                    statusEl.style.color = '#f00';
-                    console.error('PeerJS Error:', err);
-                });
-
-                // Handle incoming connections
-                peer.on('connection', (newConn) => {
-                    if (conn) {
-                        newConn.close(); // Only allow one connection for simplicity
-                        return;
-                    }
-                    conn = newConn;
-                    setupConnectionEvents(conn, false); // false = not initiator
-                });
+            // ATTACK HITBOX
+            if (player.attackTime > 0) {
+                let hitbox = getAttackBox();
+                ctx.fillStyle = "rgba(255,255,255,0.3)";
+                ctx.fillRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
             }
 
-            // Connect to a peer
-            connectButton.addEventListener('click', () => {
-                const targetId = targetIdInput.value;
-                if (!targetId || !peer || conn) return;
-
-                conn = peer.connect(targetId);
-                setupConnectionEvents(conn, true); // true = initiator
-            });
-
-            // Setup data channel events
-            function setupConnectionEvents(c, isInitiator) {
-                statusEl.innerText = isInitiator ? 'Status: Connecting...' : 'Status: Incoming...';
-                statusEl.style.color = '#ff0';
-                
-                c.on('open', () => {
-                    statusEl.innerText = 'Status: Connected to ' + c.peer;
-                    statusEl.style.color = '#0ff';
-                    console.log('Connection established.');
-                    
-                    // Start sending state updates periodically (e.g., 30 times a second)
-                    // The interval will manage synchronization
-                    setInterval(sendPlayerState, 33); // ~30 FPS network update
-                });
-
-                c.on('data', (data) => {
-                    // Handle incoming data
-                    if (data.type === 'PLAYER_STATE') {
-                        // In a full game, you would apply the opponent's state here
-                        // e.g., opponent.x = data.state.x; opponent.y = data.state.y;
-                        console.log("Received Opponent State:", data.state);
-                    }
-                });
-
-                c.on('close', () => {
-                    statusEl.innerText = 'Status: Disconnected';
-                    statusEl.style.color = '#f00';
-                    conn = null;
-                });
-
-                c.on('error', (err) => {
-                    console.error('Connection Error:', err);
-                });
+            // PARTICLES
+            for (let p of particles) {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
             }
 
-            // Function to send the current player state
-            function sendPlayerState() {
-                if (conn && conn.open) {
-                    // Collect minimal player state to send
-                    const state = {
-                        x: player.x,
-                        y: player.y,
-                        facing: player.facing,
-                        hp: player.hp,
-                        // Add other necessary state (e.g., isDashing, isBlocking)
-                    };
-                    conn.send({ type: 'PLAYER_STATE', state: state });
+            // COMPLEX VFX
+            for (let vfx of vfxQueue) {
+                ctx.globalAlpha = vfx.life / (vfx.life > 20 ? 30 : 10);
+                if (vfx.type === 'shockwave') {
+                    const maxLife = 30;
+                    const currentRadius = vfx.radius + (vfx.maxRadius - vfx.radius) * (1 - vfx.life / maxLife);
+                    ctx.strokeStyle = vfx.color;
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(vfx.x, vfx.y, currentRadius, Math.PI, 0); 
+                    ctx.stroke();
+                } else if (vfx.type === 'projectileTrail') {
+                    ctx.fillStyle = vfx.color;
+                    const maxLife = 20;
+                    const progress = 1 - vfx.life / maxLife;
+                    // Projectile targets the opponent in online mode, or the NPC in single
+                    const targetX = isOnline ? opponentState.x + opponentState.w/2 : vfx.targetX;
+                    const targetY = isOnline ? opponentState.y + opponentState.h/2 : vfx.targetY;
+                    const currentX = vfx.x + (targetX - vfx.x) * progress;
+                    const currentY = vfx.y + (targetY - vfx.y) * progress;
+                    ctx.beginPath();
+                    ctx.arc(currentX, currentY, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (vfx.type === 'impactFlash') {
+                     ctx.fillStyle = vfx.color;
+                     const size = 60 * (1 - vfx.life / 10);
+                     ctx.beginPath();
+                     ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2);
+                     ctx.fill();
+                } else if (vfx.type === 'impactRing') {
+                     ctx.strokeStyle = vfx.color;
+                     ctx.lineWidth = 3;
+                     const size = vfx.size + (50 * (1 - vfx.life / 10));
+                     ctx.beginPath();
+                     ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2);
+                     ctx.stroke();
                 }
             }
+            ctx.globalAlpha = 1;
 
-            // Start PeerJS initialization when the window loads
-            window.addEventListener('load', initializePeer);
+            // DAMAGE NUMBERS
+            ctx.font = "bold 18px Arial";
+            ctx.textAlign = "center";
+            for (let d of damageNumbers) {
+                const alpha = d.life / 60;
+                ctx.fillStyle = d.color;
+                ctx.globalAlpha = alpha;
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 3;
+                ctx.strokeText(d.text, d.x, d.y);
+                ctx.fillText(d.text, d.x, d.y);
+            }
+            ctx.globalAlpha = 1;
 
-        </script>
-    </body>
+            ctx.restore(); 
+            
+            // --- 3. DRAW SCREEN VFX (No translation, no shake) ---
+            for (let i = vfxQueue.length - 1; i >= 0; i--) {
+                const vfx = vfxQueue[i];
+                if (vfx.type === 'fullFlash') {
+                    ctx.save();
+                    ctx.globalAlpha = vfx.life / 5;
+                    ctx.fillStyle = vfx.color;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.restore();
+                }
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // --- Initial Call ---
+        initPeer(); // Initialize PeerJS/set up single player
+        loop();
+    </script>
+</body>
 </html>
