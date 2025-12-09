@@ -155,24 +155,12 @@
                 place-items: center;
                 color: #fff;
                 font-size: 10px;
-                font-weight: bold;
-                cursor: default; /* Make it look like a button */
             }
             .cd-overlay {
                 position: absolute;
                 inset: 0;
                 background: rgba(0,0,0,0.7);
                 clip-path: inset(0 0 0 0);
-                transition: clip-path 0.1s linear;
-            }
-            .energy-cost-text {
-                position: absolute;
-                bottom: 2px;
-                right: 2px;
-                font-size: 8px;
-                color: #0ff;
-                font-weight: normal;
-                text-shadow: 0 0 2px #000;
             }
             
             /* NOTIFICATIONS */
@@ -214,10 +202,10 @@
             </div>
 
             <div id="abilityBar">
-                <div class="slot">Q<div class="cd-overlay" id="cdQ"></div><span class="energy-cost-text">50 E</span></div>
-                <div class="slot">1<div class="cd-overlay" id="cd1"></div><span class="energy-cost-text">80 E</span></div>
-                <div class="slot">2<div class="cd-overlay" id="cd2"></div><span class="energy-cost-text">100 E</span></div>
-                <div class="slot">3<div class="cd-overlay" id="cd3"></div><span class="energy-cost-text">50 E</span></div>
+                <div class="slot">Q<div class="cd-overlay" id="cdQ"></div></div>
+                <div class="slot">1<div class="cd-overlay" id="cd1"></div></div>
+                <div class="slot">2<div class="cd-overlay" id="cd2"></div></div>
+                <div class="slot">3<div class="cd-overlay" id="cd3"></div></div>
                 <div class="slot">F</div>
             </div>
         </div>
@@ -263,7 +251,7 @@
             const player = {
                 x: 200, y: GROUND_Y - 60, w: 40, h: 60,
                 vx: 0, vy: 0,
-                hp: 100, maxHp: 100, energy: 100, maxEnergy: 100,
+                hp: 100, maxHp: 100, energy: 100,
                 facing: 1, // 1 = right, -1 = left
                 color: "#00ffaa",
                 isBlocking: false,
@@ -271,10 +259,6 @@
                 isAttacking: false,
                 invincible: false,
                 attackCooldown: 0,
-                dashCooldown: 0, // NEW
-                smashCooldown: 0, // NEW
-                ability2Cooldown: 0, // NEW
-                ability3Cooldown: 0, // NEW
                 stats: { str: 10, spd: 5, def: 0 },
                 build: localStorage.getItem('fracture_charbuild') || 'Strength'
             };
@@ -292,10 +276,10 @@
 
             // Build Stats Configuration
             const builds = {
-                'Strength': { str: 15, spd: 4, hp: 120, energyRegen: 0.5, color: '#ff8800' }, // Added energyRegen
-                'Speed': 	{ str: 8, spd: 9, hp: 90, energyRegen: 1.0, color: '#00ffff' },
-                'Defense': 	{ str: 10, spd: 3, hp: 150, energyRegen: 0.2, color: '#4444ff' },
-                'Energy': 	{ str: 12, spd: 5, hp: 100, energyRegen: 1.5, color: '#aa00ff' }
+                'Strength': { str: 15, spd: 4, hp: 120, color: '#ff8800' },
+                'Speed':    { str: 8, spd: 9, hp: 90, color: '#00ffff' },
+                'Defense':  { str: 10, spd: 3, hp: 150, color: '#4444ff' },
+                'Energy':   { str: 12, spd: 5, hp: 100, color: '#aa00ff' }
             };
             
             // Apply Build
@@ -306,22 +290,12 @@
                 player.maxHp = b.hp;
                 player.hp = b.hp;
                 player.color = b.color;
-                player.energyRegen = b.energyRegen || 0.5; // NEW: Energy Regen rate
             }
             opponent.hp = 100; // Will sync later
 
             // Inputs
             const keys = {};
-            document.addEventListener('keydown', e => {
-                keys[e.key.toLowerCase()] = true;
-                // NEW: Ability checks on keydown
-                if (gameActive) {
-                    if (e.key.toLowerCase() === 'q') performDash();
-                    if (e.key === '1') performSmash();
-                    // if (e.key === '2') performAbility2();
-                    // if (e.key === '3') performAbility3();
-                }
-            });
+            document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
             document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
             let mouseDown = false;
             document.addEventListener('mousedown', () => mouseDown = true);
@@ -332,8 +306,7 @@
             const damageNums = [];
             let screenShake = 0;
 
-            // ================= NETWORKING (PEERJS) - UNMODIFIED =================
-            // [ ... initNetwork(), handleConnection(c), sendData(payload), processData(data) functions remain unchanged ... ]
+            // ================= NETWORKING (PEERJS) =================
             function initNetwork() {
                 const statusEl = document.getElementById('connStatus');
                 const detailsEl = document.getElementById('connDetails');
@@ -435,34 +408,17 @@
             function update() {
                 if (!gameActive) return;
 
-                // 1. Cooldowns and Energy
-                if (player.attackCooldown > 0) player.attackCooldown--;
-                if (player.dashCooldown > 0) player.dashCooldown--; // NEW
-                if (player.smashCooldown > 0) player.smashCooldown--; // NEW
-                // if (player.ability2Cooldown > 0) player.ability2Cooldown--; // NEW
-                // if (player.ability3Cooldown > 0) player.ability3Cooldown--; // NEW
-                
-                // Energy Regeneration
-                if (!player.isBlocking) {
-                    player.energy += player.energyRegen; // Use build specific regen rate
-                    player.energy = Math.min(player.energy, player.maxEnergy);
-                }
-
-                // 2. Movement
+                // 1. Movement
                 let speed = player.stats.spd;
                 if (keys['shift']) speed *= 1.5; // Sprint
                 if (player.isBlocking) speed *= 0.4;
-                if (player.isDashing) speed *= 0; // Prevent movement during dash
 
-                if (!player.isDashing) {
-                    if (keys['a']) { player.vx = -speed; player.facing = -1; }
-                    else if (keys['d']) { player.vx = speed; player.facing = 1; }
-                    else { player.vx *= 0.8; } // Friction
-                }
-                
+                if (keys['a']) { player.vx = -speed; player.facing = -1; }
+                else if (keys['d']) { player.vx = speed; player.facing = 1; }
+                else { player.vx *= 0.8; } // Friction
 
                 // Jump
-                if (keys[' '] && player.y + player.h >= GROUND_Y && !player.isDashing) {
+                if (keys[' '] && player.y + player.h >= GROUND_Y) {
                     player.vy = -15;
                     spawnParticle(player.x + 20, player.y + 60, "#fff", 5);
                 }
@@ -481,17 +437,18 @@
                 if (player.x < 0) player.x = 0;
                 if (player.x > canvas.width - player.w) player.x = canvas.width - player.w;
 
-                // 3. Combat Actions
-                
+                // 2. Combat Actions
+                if (player.attackCooldown > 0) player.attackCooldown--;
+
                 // Blocking
-                player.isBlocking = keys['f'] && !player.isAttacking && !player.isDashing;
+                player.isBlocking = keys['f'];
 
                 // Attacking (LMB)
-                if (mouseDown && player.attackCooldown <= 0 && !player.isBlocking && !player.isDashing) {
+                if (mouseDown && player.attackCooldown <= 0 && !player.isBlocking) {
                     performAttack();
                 }
 
-                // 4. Network Sync (Send my state every frame or every other frame)
+                // 3. Network Sync (Send my state every frame or every other frame)
                 sendData({
                     type: 'sync',
                     x: Math.round(player.x),
@@ -501,91 +458,9 @@
                     atk: player.isAttacking
                 });
 
-                // 5. Update VFX
+                // 4. Update VFX
                 updateVFX();
             }
-
-            // ================= ABILITY IMPLEMENTATION (NEW) =================
-            const ABILITY_CONFIG = {
-                'Q': { cost: 50, cd: 60 },
-                '1': { cost: 80, cd: 120 }
-            }
-
-            function performDash() {
-                const config = ABILITY_CONFIG.Q;
-                if (player.dashCooldown > 0 || player.energy < config.cost || player.isAttacking) {
-                    if (player.energy < config.cost) showNotif("NOT ENOUGH ENERGY");
-                    return;
-                }
-
-                player.energy -= config.cost;
-                player.dashCooldown = config.cd;
-                player.isDashing = true;
-                player.invincible = true; // Temporary Invincibility
-
-                // Dash Movement
-                player.vx = player.facing * 30;
-                player.vy = 0;
-
-                // Trail Effect
-                const trailInterval = setInterval(() => {
-                    spawnParticle(player.x + 20, player.y + 30, player.color, 3);
-                }, 20);
-
-                setTimeout(() => {
-                    clearInterval(trailInterval);
-                    player.isDashing = false;
-                    player.invincible = false;
-                    player.vx *= 0.5; // Apply a bit of friction at the end
-                }, 200); // Dash duration
-            }
-
-            function performSmash() {
-                const config = ABILITY_CONFIG['1'];
-                if (player.smashCooldown > 0 || player.energy < config.cost || player.isAttacking) {
-                    if (player.energy < config.cost) showNotif("NOT ENOUGH ENERGY");
-                    return;
-                }
-                
-                player.energy -= config.cost;
-                player.smashCooldown = config.cd;
-                player.isAttacking = true; // Use existing attack state
-
-                // Smash properties
-                const range = 80;
-                const hitX = player.facing === 1 ? player.x + player.w : player.x - range;
-                const hitbox = { x: hitX, y: player.y, w: range, h: player.h };
-                const oppBox = { x: opponent.x, y: opponent.y, w: opponent.w, h: opponent.h };
-                
-                // Visual jump/slam preparation
-                player.vy = -5; 
-                player.vx = 0;
-
-                // Delay the actual hit to feel like a windup
-                setTimeout(() => {
-                    if (checkCollision(hitbox, oppBox)) {
-                        // HIT! Massive Damage/Knockback
-                        const dmg = player.stats.str * 4; 
-                        const kbForce = 25;
-                        
-                        screenShake = 20; // Bigger shake
-                        spawnParticle(oppBox.x + 20, oppBox.y + 30, "#ff8800", 25);
-                        
-                        sendData({
-                            type: 'hit',
-                            dmg: dmg,
-                            kbDir: player.facing,
-                            kbForce: kbForce
-                        });
-                        spawnFloatText("SMASH!", oppBox.x + 20, oppBox.y - 40, "#ff8800");
-                    }
-                    player.isAttacking = false;
-                }, 300);
-
-                setTimeout(() => player.isAttacking = false, 500); // Ensure attack state resets
-            }
-
-            // ================= CORE COMBAT =================
 
             function performAttack() {
                 player.isAttacking = true;
@@ -629,10 +504,12 @@
                 
                 // Block Check
                 if (player.isBlocking) {
-                    // Reduce damage
+                    // Check if facing the damage source
+                    const hitFromRight = (dir === -1);
+                    const facingRight = (player.facing === 1);
+                    // If blocking towards the hit? (Simplified: Just press F to reduce dmg)
                     finalDmg *= 0.2; 
                     spawnFloatText("BLOCKED", player.x, player.y - 20, "#aaa");
-                    screenShake = 2; // Minor shake on block
                 } else {
                     spawnFloatText("-" + Math.round(finalDmg), player.x, player.y - 20, "#f00");
                     screenShake = 10;
@@ -641,8 +518,7 @@
                 }
 
                 player.hp -= finalDmg;
-                player.vx = dir * force * (player.isBlocking ? 0.3 : 1.0); // Less knockback when blocking
-                player.vy = -force * 0.5; // Upward knockback
+                player.vx = dir * force; // Knockback applied locally
                 
                 // Send new HP back to sync UI
                 sendData({ type: 'hp_update', hp: player.hp });
@@ -674,7 +550,6 @@
                     let p = particles[i];
                     p.x += p.vx;
                     p.y += p.vy;
-                    p.vy += 0.5; // Apply gravity to particles
                     p.life--;
                     if (p.life <= 0) particles.splice(i, 1);
                 }
@@ -688,38 +563,18 @@
                 if (screenShake > 0) screenShake--;
 
                 // UI Bars
-                const p1HpPct = Math.max(0, (player.hp / player.maxHp) * 100);
-                document.getElementById('p1HpFill').style.width = p1HpPct + "%";
+                const p1Pct = Math.max(0, (player.hp / player.maxHp) * 100);
+                document.getElementById('p1HpFill').style.width = p1Pct + "%";
                 document.getElementById('p1HpText').innerText = Math.ceil(player.hp);
-                
-                const p1EngPct = Math.max(0, (player.energy / player.maxEnergy) * 100);
-                document.getElementById('p1EngFill').style.width = p1EngPct + "%";
                 
                 const p2Pct = Math.max(0, (opponent.hp / opponent.maxHp) * 100);
                 document.getElementById('p2HpFill').style.width = p2Pct + "%";
                 document.getElementById('p2HpText').innerText = Math.ceil(opponent.hp);
                 
-                // Ability Cooldown UI
-                updateCooldownUI('cdQ', player.dashCooldown, ABILITY_CONFIG.Q.cd);
-                updateCooldownUI('cd1', player.smashCooldown, ABILITY_CONFIG['1'].cd);
-                // updateCooldownUI('cd2', player.ability2Cooldown, 100);
-                // updateCooldownUI('cd3', player.ability3Cooldown, 80);
-
                 // Check Win via UI sync (backup check)
                 if (opponent.hp <= 0 && gameActive) {
                     gameActive = false;
                     showWinScreen(true);
-                }
-            }
-            
-            // NEW: Function to manage the cooldown overlay
-            function updateCooldownUI(id, currentCD, maxCD) {
-                const el = document.getElementById(id);
-                if (el) {
-                    const percentage = currentCD / maxCD;
-                    // Clip-path inset to simulate vertical fill of cooldown
-                    const clipValue = percentage * 100; // 0 to 100
-                    el.style.clipPath = `inset(${clipValue}% 0 0 0)`;
                 }
             }
 
@@ -747,9 +602,10 @@
 
                 // Draw Opponent
                 if (opponent.connected) {
-                    ctx.fillStyle = opponent.isBlocking ? "#555" : opponent.color;
+                    ctx.fillStyle = opponent.isBlocking ? "#555" : "#ff3333";
                     if (opponent.isAttacking) ctx.fillStyle = "#fff"; // Flash on attack
                     
+                    // Facing flip
                     // Simple Rect for now
                     ctx.fillRect(opponent.x, opponent.y, opponent.w, opponent.h);
                     
@@ -761,7 +617,7 @@
 
                 // Draw Player
                 ctx.fillStyle = player.isBlocking ? "#888" : player.color;
-                if (player.isAttacking || player.isDashing) ctx.fillStyle = "#fff"; // Flash for attacks/dash
+                if (player.isAttacking) ctx.fillStyle = "#fff"; // Flash
                 ctx.fillRect(player.x, player.y, player.w, player.h);
                 
                 // Eye
