@@ -113,53 +113,89 @@
                 background: #f33;
             }
 
-            /* Ability Bar */
+            /* Ability Bar - compact and anchored to the very bottom-right corner (smaller) */
             #abilityBar {
                 position: fixed;
-                bottom: 10px;
-                left: 50%;
-                transform: translateX(-50%);
-                width: 200px;
-                background: rgba(40, 40, 40, 0.35);
-                border-top: 1px solid #b00;
-                border-bottom: 1px solid #b00;
-                padding: 4px;
-                text-align: center;
-                color: white;
-                font-family: Arial;
-                z-index: 20;
-                border-radius: 4px;
+                bottom: 6px;        /* very bottom */
+                right: 6px;         /* very right */
+                width: 120px;       /* much smaller container */
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                align-items: flex-end;
+                padding: 6px;
+                z-index: 80;
+                background: linear-gradient(180deg, rgba(10,12,16,0.75), rgba(6,8,12,0.65));
+                border-radius: 6px;
+                border-left: 1px solid rgba(255,255,255,0.03);
+                box-shadow: 0 8px 24px rgba(0,0,0,0.75);
+                transform: rotate(-3deg); /* small negative angle */
+                transform-origin: bottom right;
+                backdrop-filter: blur(3px);
+                pointer-events: auto;
             }
 
+            /* Title sits at the top of the angled column; counter-rotate to read horizontally */
             #abilityTitle {
-                font-size: 10px;
-                letter-spacing: 1px;
+                font-size: 9px;
+                letter-spacing: 0.6px;
                 font-weight: bold;
                 margin-bottom: 2px;
-                opacity: 0.8;
+                opacity: 0.95;
+                color: #9bdcff;
+                text-shadow: 0 0 6px rgba(102,200,255,0.12);
+                align-self: flex-end;
+                transform: rotate(3deg); /* counter-rotate so text reads straight */
             }
 
+            /* Each slot is visually horizontal but counter-rotated to sit inside the angled column */
             .abilitySlot {
-                display: inline-block;
-                width: 40px;
-                height: 38px;
-                margin: 0 2px;
-                background: rgba(20, 20, 20, 0.55);
-                border: 1px solid #555;
-                padding: 2px;
+                width: 100px;       /* compact slot width */
+                height: 26px;       /* thinner slot */
+                background: linear-gradient(180deg, rgba(25,26,30,0.82), rgba(12,12,16,0.66));
+                border: 1px solid rgba(255,255,255,0.04);
                 border-radius: 4px;
+                padding: 3px 6px;
+                box-shadow: 0 3px 10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 6px;
                 position: relative;
+                transform: rotate(3deg); /* counter-rotate so content reads horizontally */
+                cursor: default;
+                font-family: Arial, sans-serif;
+            }
+
+            .abilitySlot:hover {
+                box-shadow: 0 8px 20px rgba(0,0,0,0.75), 0 0 10px rgba(80,160,255,0.03);
+                transform: rotate(4deg) translateX(-1px);
             }
 
             .abilityKey {
-                font-size: 11px;
+                width: 26px;
+                min-width: 26px;
+                height: 20px;
+                line-height: 20px;
+                background: rgba(0,0,0,0.45);
                 color: #fff;
+                font-weight: 700;
+                text-align: center;
+                border-radius: 3px;
+                border: 1px solid rgba(255,255,255,0.04);
+                font-size: 11px;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.6);
             }
 
             .abilityName {
-                font-size: 8px;
-                margin-top: 1px;
-                color: #ccc;
+                flex: 1;
+                text-align: right;
+                font-size: 10px;
+                color: #cfeeff;
+                font-weight: 700;
+                letter-spacing: 0.2px;
+                text-shadow: 0 0 3px rgba(120,200,255,0.06);
+                padding-right: 6px;
             }
 
             .cooldownOverlay {
@@ -168,12 +204,13 @@
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.45);
+                background: rgba(0, 0, 0, 0.55);
                 pointer-events: none;
                 clip-path: inset(0 0 0 0);
                 border-radius: 4px;
+                transition: clip-path 0.1s linear;
             }
-            
+
             /* Stats Menu Overlay */
             #statsMenu {
                 position: fixed;
@@ -227,7 +264,7 @@
                 transition: background-color 0.1s ease-out; /* Smoother flash transition */
             }
 
-            /* Zero-Point diamond HUD (we draw on canvas but keep a helper div for accessibility if needed) */
+            /* Zero-Point diamond HUD helper text (DOM) */
             #zeroPointHint {
                 position: fixed;
                 left: 50%;
@@ -241,6 +278,14 @@
                 text-align: center;
                 display: none;
                 text-shadow: 0 0 6px #000;
+            }
+
+            /* Keep the bar usable on very small screens */
+            @media (max-width: 420px) {
+                #abilityBar { right: 6px; bottom: 6px; width: 110px; transform: rotate(-3deg); padding: 6px; }
+                .abilitySlot { width: 90px; height: 24px; transform: rotate(3deg); padding: 3px 5px; }
+                .abilityKey { width: 24px; height: 18px; font-size: 10px; }
+                #abilityTitle { transform: rotate(3deg); font-size: 8px; }
             }
         </style>
     </head>
@@ -274,27 +319,32 @@
             <div id="npcHpBarInner"></div>
         </div>
 
+        <!-- Ability bar moved to very bottom-right and made much smaller -->
         <div id="abilityBar">
-            <div id="abilityTitle">Universal: <span id="uniAbilityName">Punch</span> (LMB) </div>
+            <div id="abilityTitle">Universal: <span id="uniAbilityName">Punch</span> (LMB)</div>
+
             <div class="abilitySlot" id="slot1">
                 <div class="cooldownOverlay" id="cool1"></div>
+                <div class="abilityName" style="text-align:left; font-size:10px; color:#9be7ff;">1 — <span id="name1">Ability 1</span></div>
                 <div class="abilityKey">1</div>
-                <div class="abilityName" id="name1">Ability 1</div>
             </div>
+
             <div class="abilitySlot" id="slot2">
                 <div class="cooldownOverlay" id="cool2"></div>
+                <div class="abilityName" style="text-align:left; font-size:10px; color:#9be7ff;">2 — <span id="name2">Ability 2</span></div>
                 <div class="abilityKey">2</div>
-                <div class="abilityName" id="name2">Ability 2</div>
             </div>
+
             <div class="abilitySlot" id="slot3">
                 <div class="cooldownOverlay" id="cool3"></div>
+                <div class="abilityName" style="text-align:left; font-size:10px; color:#9be7ff;">3 — <span id="name3">Ability 3</span></div>
                 <div class="abilityKey">3</div>
-                <div class="abilityName" id="name3">Ability 3</div>
             </div>
+
             <div class="abilitySlot" id="slot4">
                 <div class="cooldownOverlay" id="cool4"></div>
+                <div class="abilityName" style="text-align:left; font-size:10px; color:#ffd08a;">4 — <span id="name4">Punch</span></div>
                 <div class="abilityKey">4</div>
-                <div class="abilityName" id="name4">Punch</div> 
             </div>
         </div>
         
@@ -621,33 +671,27 @@
             function triggerZeroPointImpactFromMultiplier(multiplier) {
                 // multiplier: amplification factor (e.g. 2.5 - 3.0)
                 // Strong visuals: black flash with white core, extreme screen shake, particles and shockwave
-                // Big damage relative to player's strength
                 const base = player.stats.strength * 1.5;
                 const finalDamage = base * multiplier;
 
-                // Apply to NPC if it's alive and in front / in range
                 const dist = Math.abs((player.x + player.w/2) - (npc.x + npc.w/2));
-                const range = 600; // generous range for zero-point
+                const range = 600;
                 if (npc.alive && dist < range) {
-                    // Large knockback scaled by multiplier
                     const knockback = 30 * multiplier;
                     dealDamageToNPC(finalDamage, true, knockback);
                 }
 
-                // Intense VFX
                 vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: multiplier });
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ffffff", 120 * multiplier, 35 * multiplier);
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff0000", 90 * multiplier, 28 * multiplier);
-                triggerScreenShake(35, 28 * Math.min(multiplier / 2, 2.5));
-                // Very bright white flash briefly after the black flash for contrast
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ffffff", Math.max(20, 40 * multiplier), 18 * multiplier);
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff0000", Math.max(12, 30 * multiplier), 16 * multiplier);
+                triggerScreenShake(25, 16 * Math.min(multiplier / 2, 2.5));
                 setTimeout(() => {
-                    triggerFullFlash("#ffffff", 6);
-                }, 60);
-                // small cooldown penalty
+                    triggerFullFlash("#ffffff", 4);
+                }, 40);
                 zeroPoint.cooldown = zeroPoint.cooldownMax;
             }
 
-            // ===== COMBAT SYSTEM (UPDATED FOR KNOCKBACK & VFX) =====
+            // ===== COMBAT SYSTEM (unchanged) =====
             function rectCollide(a, b) {
                 return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + a.h && a.y + a.h > b.y;
             }
@@ -656,7 +700,7 @@
                 const ground = GROUND_Y;
                 return {
                     x: npc.x,
-                    y: npc.isAirborne ? npc.y : ground - npc.h, // Fixed hitbox for airborne
+                    y: npc.isAirborne ? npc.y : ground - npc.h,
                     w: npc.w,
                     h: npc.h
                 };
@@ -672,14 +716,12 @@
                 };
             }
 
-            // UPDATED: Added knockbackForce parameter
             function dealDamageToNPC(amount, isAbility = false, knockbackForce = 0) {
                 let npcBox = getNPCBox();
                 let hitbox = getAttackBox();
                 let finalDmg = amount;
 
                 if (rectCollide(hitbox, npcBox) && npc.alive) {
-                    // Critical Hit
                     let dmgColor = isAbility ? "#00ffff" : "#ffffff";
                     let isCrit = Math.random() < 0.1;
                     if (isCrit) {
@@ -690,25 +732,16 @@
 
                     npc.hp -= finalDmg;
 
-                    // --- PHYSICS: KNOCKBACK ---
-                    // Determine direction from player to NPC
                     let knockDir = (player.x + player.w/2 < npc.x + npc.w/2) ? 1 : -1;
                     npc.velX = knockDir * knockbackForce;
 
-                    // --- VFX: HIT FLASH ---
-                    npc.hitFlashTimer = 6; // Flash white for 6 frames
+                    npc.hitFlashTimer = 6;
 
-                    // --- VFX: PARTICLES (Blood and Sparks) ---
-                    // Sparks fly in direction of knockback
-                    directionalBurst(npcBox.x + npcBox.w/2, npcBox.y + npcBox.h/2, "#fff", 15, knockDir); // INCREASED SPARKS
-                    // "Blood" / Energy fly up
-                    directionalBurst(npcBox.x + npcBox.w/2, npcBox.y + npcBox.h/2, "#ff0000", 10, knockDir / 4, 8); // Added knockDir for subtle direction
-                    
-                    // --- VFX: IMPACT RING ---
+                    directionalBurst(npcBox.x + npcBox.w/2, npcBox.y + npcBox.h/2, "#fff", 15, knockDir);
+                    directionalBurst(npcBox.x + npcBox.w/2, npcBox.y + npcBox.h/2, "#ff0000", 10, knockDir / 4, 8);
+
                     vfxQueue.push({ type: 'impactRing', x: npcBox.x + npcBox.w/2, y: npcBox.y + npcBox.h/2, color: "#fff", life: 10, size: 5 });
 
-
-                    // --- METRICS ---
                     combatMetrics.totalDamage += finalDmg;
                     combatMetrics.damageLog.push({ time: Date.now(), damage: finalDmg });
                     combatMetrics.comboCount++;
@@ -720,8 +753,8 @@
                         document.getElementById('comboCounter').style.transform = 'scale(1.0)';
                     }, 50);
 
-                    if (isAbility) triggerScreenShake(15, 10); // HEAVY SHAKE
-                    else triggerScreenShake(8, 4); // MEDIUM SHAKE
+                    if (isAbility) triggerScreenShake(15, 10);
+                    else triggerScreenShake(8, 4);
 
                     createDamageNumber(finalDmg, npcBox.x + npcBox.w / 2, npcBox.y, dmgColor);
                     document.getElementById("npcHpBar").style.display = "block";
@@ -730,32 +763,26 @@
                         npc.alive = false;
                         gainXP(npc.xpValue);
                         combatMetrics.comboCount = 0;
-                        
-                        // Death Explosion
-                        burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#f00", 80, 15); // MORE PARTICLES
-                        triggerScreenShake(20, 15); // HEAVY SHAKE
-                        triggerFullFlash("#ffffff", 5); // KILL IMPACT FRAME
+                        burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#f00", 80, 15);
+                        triggerScreenShake(20, 15);
+                        triggerFullFlash("#ffffff", 5);
                     }
                 }
             }
-            
+
             function dealDamageToPlayer(amount) {
                 if (player.invincible) return;
 
                 let incomingDmg = amount;
-                
-                // Determine direction for particle effect
                 let npcDir = (player.x + player.w/2 < npc.x + npc.w/2) ? 1 : -1; 
                 
                 if (player.isBlocking) {
                     incomingDmg *= 0.1;
                     createDamageNumber("Block!", player.x + player.w / 2, player.y - 10, "#888");
-                    // Spark on shield hit
-                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#00ccff", 10, -npcDir); // Particles away from NPC
+                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#00ccff", 10, -npcDir);
                 } else {
-                    triggerScreenShake(10, 5); // Shake when player gets hit
-                    // NEW: Player Hit Particles (Blood/Impact)
-                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#ffaa00", 15, -npcDir); // Yellow/Orange hit particles away from NPC
+                    triggerScreenShake(10, 5);
+                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#ffaa00", 15, -npcDir);
                 }
 
                 incomingDmg = incomingDmg - player.stats.defense;
@@ -770,7 +797,6 @@
                 player.hp -= incomingDmg;
                 if (player.hp < 0) player.hp = 0;
                 
-                // NEW: Small knockback to player when hit (if not blocking)
                 if (!player.isBlocking) {
                     player.x += -npcDir * 10;
                     player.velX = -npcDir * 5;
@@ -787,12 +813,12 @@
                     npc.hp = npc.maxHp;
                     npc.alive = true;
                     document.getElementById("npcHpBar").style.display = "none";
-                    npc.x = 400; // Reset position
+                    npc.x = 400;
                 }
             }, 2000);
 
 
-            // ===================== ABILITIES (UPDATED PUNCH) =====================
+            // ===================== ABILITIES (unchanged) =====================
             function universalPunch() {
                 if (player.attackCooldown <= 0) {
                     player.attackTime = 10;
@@ -801,13 +827,13 @@
                     let moveType = 'Punch';
                     
                     const onGround = player.y + player.h >= GROUND_Y;
-                    let knockback = 4; // Standard Knockback
+                    let knockback = 4;
                     
                     if (!onGround) {
                         if (player.velY < 0) {
                             damage *= 1.8;
                             moveType = 'Uppercut';
-                            knockback = 1; // Less horizontal, more vertical (logic handled in hit block)
+                            knockback = 1;
                         } else if (player.velY > 0) {
                             damage *= 2.2;
                             moveType = 'Downslam';
@@ -815,24 +841,20 @@
                         }
                     }
 
-                    // ZERO-POINT: if charged, amplify punch
                     if (zeroPoint.charged) {
-                        // Random between 2.5 and 3.0
                         const mul = 2.5 + Math.random() * 0.5;
                         damage *= mul;
-                        knockback *= mul * 6; // heavier knockback
-                        // Visuals for Zero-Point Punch
+                        knockback *= mul * 6;
                         vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: mul });
-                        burstParticles(player.x + player.w/2, player.y + player.h/2, "#ffffff", 80 * mul, 24 * mul);
+                        burstParticles(player.x + player.w/2, player.y + player.h/2, "#ffffff", Math.max(20, 40 * mul), 18 * mul);
                         triggerScreenShake(30, 20 * mul);
-                        triggerFullFlash("#ffffff", 6);
+                        triggerFullFlash("#ffffff", 4);
                         zeroPoint.charged = false;
                         zeroPoint.active = false;
                         zeroPoint.timer = 0;
                         zeroPoint.cooldown = zeroPoint.cooldownMax;
                     }
 
-                    // Passing knockback here
                     dealDamageToNPC(damage, false, knockback);
                     
                     let npcBox = getNPCBox();
@@ -841,25 +863,25 @@
                     if (rectCollide(hitbox, npcBox) && npc.alive) {
                         if (moveType === 'Uppercut') {
                             vfxQueue.push({ type: 'shockwave', x: npc.x + npc.w / 2, y: npc.y + npc.h / 2, color: "#ffffff", life: 15, radius: 10, maxRadius: 150 });
-                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#fff", 80, 15); // MORE PARTICLES
-                            triggerScreenShake(15, 8); // HEAVY SHAKE
+                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#fff", 80, 15);
+                            triggerScreenShake(15, 8);
 
                             npc.isAirborne = true;
                             npc.airborneVelY = -25;
                             npc.airborneLife = 30;
-                            npc.velX = 0; // Stop horizontal movement for uppercut
+                            npc.velX = 0;
                             
                             player.velY = -15; 
                             player.jumpCount = player.maxJumps; 
                         } else if (moveType === 'Downslam') {
                             vfxQueue.push({ type: 'shockwave', x: npc.x + npc.w / 2, y: GROUND_Y, color: "#ff0000", life: 30, radius: 20, maxRadius: 800 });
-                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#ff0000", 120, 20); // MORE PARTICLES
-                            triggerScreenShake(30, 20); // HEAVY SHAKE
+                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#ff0000", 120, 20);
+                            triggerScreenShake(30, 20);
 
                             npc.isAirborne = false; 
                             npc.airborneLife = 0;
                             npc.y = GROUND_Y - npc.h;
-                            npc.velX = 0; // Stop horizontal sliding
+                            npc.velX = 0;
                             
                             vfxQueue.push({ type: 'impactFlash', x: npc.x + npc.w / 2, y: GROUND_Y, color: "#ffaa00", life: 10 });
 
@@ -882,7 +904,7 @@
                 player.isDashing = true; 
                 player.hasDashHit = false;
                 player.velX = player.facing * 18;
-                burstParticles(player.x, player.y + player.h / 2, "#4aff00", 30, 8); // MORE PARTICLES
+                burstParticles(player.x, player.y + player.h / 2, "#4aff00", 30, 8);
                 
                 const interval = setInterval(() => {
                     if (player.isDashing) {
@@ -894,135 +916,19 @@
             }
 
 
-            // --- SPEED BUILD ABILITIES --- 
+            // Abilities for builds (unchanged)...
             function speed_ability1() { } 
-
-            function speed_ability2() { // Double Jump
-                if (abilityCooldowns[1] > 0) return;
-                abilityCooldowns[1] = 90;
-                player.jumpCount = 0;
-                player.velY = -12;
-                burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3); // UPDATED TO BURST
-            }
-
-            function speed_ability3() { // Blur
-                if (abilityCooldowns[2] > 0 || player.energy < 20) return;
-                player.energy -= 20;
-                abilityCooldowns[2] = 180;
-                player.invincible = true;
-                triggerScreenShake(15, 10); // HEAVY SHAKE
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 50, 15); // MORE PARTICLES
-                setTimeout(() => {
-                    player.invincible = false;
-                }, 1000);
-            }
-
-            // --- STRENGTH BUILD ABILITIES --- 
-            function strength_ability1() { // Ground Smash
-                if (abilityCooldowns[0] > 0 || player.energy < 30) return;
-                player.energy -= 30;
-                abilityCooldowns[0] = 90;
-                let dmg = player.stats.strength * 2.5;
-                dealDamageToNPC(dmg, true, 20); // BIG KNOCKBACK
-                burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12); // MORE PARTICLES
-                vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500 });
-                triggerScreenShake(20, 15); // HEAVY SHAKE
-            }
-
-            function strength_ability2() { // Punch Combo
-                if (abilityCooldowns[1] > 0 || player.stamina < 40) return;
-                player.stamina -= 40;
-                abilityCooldowns[1] = 60;
-                let hits = 4;
-                let dmgPerHit = player.stats.strength * 0.7;
-                for (let i = 0; i < hits; i++) {
-                    setTimeout(() => {
-                        // Small knockback per hit, last hit could be larger but we'll keep it consistent
-                        dealDamageToNPC(dmgPerHit, true, 3); 
-                        createAfterimage(player.x + player.w, player.y, 10, player.h, "#ff880055");
-                    }, i * 100);
-                }
-            }
-
-            function strength_ability3() { // Berserk Mode
-                if (abilityCooldowns[2] > 0 || player.energy < 50) return;
-                player.energy -= 50;
-                abilityCooldowns[2] = 240;
-                player.berserkMode = true;
-                player.stats.defense = -5;
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff5555", 80, 20); // MORE PARTICLES
-                triggerScreenShake(25, 18); // HEAVY SHAKE
-                setTimeout(() => {
-                    player.berserkMode = false;
-                    player.stats.defense = buildStats[savedBuild].def;
-                    burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#55ff55", 50, 12);
-                }, 4000);
-            }
-
-            // --- DEFENSE BUILD ABILITIES ---
-            function defense_ability1() { // Shield Wall
-                if (abilityCooldowns[0] > 0 || player.energy < 15) return;
-                player.energy -= 15;
-                abilityCooldowns[0] = 120;
-                player.stats.defense += 10;
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#0000ff", 30, 8); // MORE PARTICLES
-                setTimeout(() => {
-                    player.stats.defense -= 10;
-                }, 2000);
-            }
-
-            function defense_ability2() { // Armor Boost
-                if (abilityCooldowns[1] > 0 || player.energy < 20) return;
-                player.energy -= 20;
-                abilityCooldowns[1] = 180;
-                let heal = player.maxHp * 0.15;
-                player.hp = Math.min(player.maxHp, player.hp + heal);
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ff00", 40, 10); // MORE PARTICLES
-                createDamageNumber(heal.toFixed(0) + " Heal", player.x + player.w / 2, player.y - 20, "#00ff00");
-            }
-
-            function defense_ability3() { // Thorns
-                if (abilityCooldowns[2] > 0 || player.energy < 10) return;
-                player.energy -= 10;
-                abilityCooldowns[2] = 180;
-                player.stats.reflectDamage = 0.5;
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#8888ff", 25, 6);
-                setTimeout(() => {
-                    player.stats.reflectDamage = 0.3;
-                }, 3000);
-            }
-
-            // --- ENERGY BUILD ABILITIES --- 
-            function energy_ability1() { // Fireball
-                if (abilityCooldowns[0] > 0 || player.energy < 25) return;
-                player.energy -= 25;
-                abilityCooldowns[0] = 90;
-                let dmg = player.stats.energy * 0.8;
-                dealDamageToNPC(dmg, true, 10); // Moderate knockback
-                vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: npc.x, targetY: npc.y, color: "#ff6600", life: 20 });
-                burstParticles(npc.x, npc.y + npc.h / 2, "#ff6600", 40, 10); // MORE PARTICLES
-            }
-
-            function energy_ability2() { // Energy Beam
-                if (abilityCooldowns[1] > 0 || player.energy < 40) return;
-                player.energy -= 40;
-                abilityCooldowns[1] = 150;
-                let dmg = player.stats.energy * 1.5;
-                dealDamageToNPC(dmg, true, 25); // MASSIVE KNOCKBACK
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); // MORE PARTICLES
-                triggerScreenShake(20, 12); // HEAVY SHAKE
-            }
-
-            function energy_ability3() { // Teleport
-                if (abilityCooldowns[2] > 0 || player.energy < 15) return;
-                player.energy -= 15;
-                abilityCooldowns[2] = 60;
-                createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99");
-                burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); // MORE PARTICLES
-                player.x += player.facing * 150;
-                createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99");
-                burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); // MORE PARTICLES
-            }
+            function speed_ability2() { if (abilityCooldowns[1] > 0) return; abilityCooldowns[1] = 90; player.jumpCount = 0; player.velY = -12; burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3); }
+            function speed_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 20) return; player.energy -= 20; abilityCooldowns[2] = 180; player.invincible = true; triggerScreenShake(15, 10); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 50, 15); setTimeout(()=>player.invincible=false,1000); }
+            function strength_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 30) return; player.energy -= 30; abilityCooldowns[0] = 90; let dmg = player.stats.strength * 2.5; dealDamageToNPC(dmg, true, 20); burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12); vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500}); triggerScreenShake(20,15); }
+            function strength_ability2() { if (abilityCooldowns[1] > 0 || player.stamina < 40) return; player.stamina -= 40; abilityCooldowns[1] = 60; let hits = 4; let dmgPerHit = player.stats.strength * 0.7; for (let i=0;i<hits;i++) setTimeout(()=>{dealDamageToNPC(dmgPerHit,true,3); createAfterimage(player.x+player.w,player.y,10,player.h,"#ff880055");}, i*100); }
+            function strength_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 50) return; player.energy -= 50; abilityCooldowns[2] = 240; player.berserkMode = true; player.stats.defense = -5; burstParticles(player.x+player.w/2,player.y+player.h/2,"#ff5555",80,20); triggerScreenShake(25,18); setTimeout(()=>{player.berserkMode=false; player.stats.defense = buildStats[savedBuild].def; burstParticles(player.x+player.w/2,player.y+player.h/2,"#55ff55",50,12);},4000); }
+            function defense_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[0] = 120; player.stats.defense += 10; burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#0000ff", 30, 8); setTimeout(()=>player.stats.defense -= 10,2000); }
+            function defense_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 20) return; player.energy -= 20; abilityCooldowns[1] = 180; let heal = player.maxHp * 0.15; player.hp = Math.min(player.maxHp, player.hp + heal); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ff00", 40, 10); createDamageNumber(heal.toFixed(0) + " Heal", player.x + player.w / 2, player.y - 20, "#00ff00"); }
+            function defense_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 10) return; player.energy -= 10; abilityCooldowns[2] = 180; player.stats.reflectDamage = 0.5; burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#8888ff", 25, 6); setTimeout(()=>player.stats.reflectDamage = 0.3,3000); }
+            function energy_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 25) return; player.energy -= 25; abilityCooldowns[0] = 90; let dmg = player.stats.energy * 0.8; dealDamageToNPC(dmg, true, 10); vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: npc.x, targetY: npc.y, color: "#ff6600", life: 20 }); burstParticles(npc.x, npc.y + npc.h / 2, "#ff6600", 40, 10); }
+            function energy_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 40) return; player.energy -= 40; abilityCooldowns[1] = 150; let dmg = player.stats.energy * 1.5; dealDamageToNPC(dmg, true, 25); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); triggerScreenShake(20,12); }
+            function energy_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[2] = 60; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); player.x += player.facing * 150; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); }
 
             // ===================== INPUT HANDLER =====================
             function ability1() {
@@ -1052,13 +958,9 @@
                 if (e.key === "1") ability1();
                 if (e.key === "2") ability2();
                 if (e.key === "3") ability3();
-                // R triggers Zero-Point Impact when diamond is active / charged
                 if (e.key.toLowerCase() === 'r') {
                     if ((zeroPoint.active && !zeroPoint.charged) || zeroPoint.charged) {
-                        // compute progress and trigger impact scaled by progress
                         const progress = Math.min(1, zeroPoint.timer / zeroPoint.duration);
-                        // multiplier ranges from 1 + 1.5*progress to 1 + 3.0*progress, and we want final to be between 2.5 and 3.0 at full
-                        // use baseRange = [2.5, 3.0] at full; at partial scale proportionally: 1 + (1.5 + 1.5*rand)*progress => simpler:
                         const minMul = 2.5;
                         const maxMul = 3.0;
                         const mul = 1 + (minMul - 1) * progress + Math.random() * ((maxMul - minMul) * progress);
@@ -1071,10 +973,8 @@
                 }
             });
 
-            // Right click to start charging Zero-Point diamond
             canvas.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                // can't start while on cooldown
                 if (zeroPoint.cooldown > 0 || menuOpen) return;
                 startZeroPointCharge();
             });
@@ -1084,8 +984,7 @@
                 zeroPoint.timer = 0;
                 zeroPoint.charged = false;
                 document.getElementById('zeroPointHint').style.display = 'block';
-                // small initial particle burst to indicate start
-                burstParticles(player.x + player.w/2, player.y + player.h/2, "#ff2244", 30, 10);
+                burstParticles(player.x + player.w/2, player.y + player.h/2, "#ff2244", 18, 8);
             }
 
             function updateAbilityCooldowns() {
@@ -1110,33 +1009,23 @@
             function update() {
                 if (menuOpen) return;
 
-                // manage zeroPoint cooldown
                 if (zeroPoint.cooldown > 0) zeroPoint.cooldown--;
 
-                // ZERO-POINT: charging logic (frame-based)
                 if (zeroPoint.active) {
                     zeroPoint.timer++;
                     if (zeroPoint.timer >= zeroPoint.duration) {
                         zeroPoint.charged = true;
-                        // keep charged state visible until used (or a short linger)
-                        // show hint
                         document.getElementById('zeroPointHint').innerText = 'Zero-Point Ready! Press LMB to punch (or R to detonate)';
-                        // we don't automatically remove; allow player to use charged punch
                     } else {
-                        // update hint text about timing
-                        const remaining = Math.ceil((zeroPoint.duration - zeroPoint.timer) / 60 * 100) / 100;
                         document.getElementById('zeroPointHint').innerText = 'Zero-Point Charging...';
                     }
 
-                    // After the visible 2 seconds (charging window) if not charged and timer > duration + small grace, still show charged for a bit
-                    const lingerFrames = 180; // how long charged state lingers before disappearing (frames)
+                    const lingerFrames = 180;
                     if (!zeroPoint.charged && zeroPoint.timer > zeroPoint.duration + 30) {
-                        // if diamond wasn't allowed to fully charge (shouldn't happen normally), hide it
                         zeroPoint.active = false;
                         zeroPoint.timer = 0;
                         document.getElementById('zeroPointHint').style.display = 'none';
                     } else if (zeroPoint.charged && zeroPoint.timer > zeroPoint.duration + lingerFrames) {
-                        // expire charged if unused for a while
                         zeroPoint.active = false;
                         zeroPoint.timer = 0;
                         zeroPoint.charged = false;
@@ -1146,16 +1035,12 @@
 
                 // --- UPDATE NPC PHYSICS (KNOCKBACK) ---
                 if (npc.alive) {
-                    // Apply velocity
                     npc.x += npc.velX;
-                    // Apply friction
                     npc.velX *= 0.9;
                     if (Math.abs(npc.velX) < 0.5) npc.velX = 0;
                     
-                    // Hit Flash Timer
                     if (npc.hitFlashTimer > 0) npc.hitFlashTimer--;
 
-                    // Keep inside arena (roughly)
                     if (npc.x < -200) npc.x = -200;
                     if (npc.x > canvas.width + 200) npc.x = canvas.width + 200;
                 }
@@ -1174,15 +1059,11 @@
                 }
 
                 // --- PLAYER MOVEMENT & PHYSICS ---
-                
-                // Track previous ground state for landing dust
                 player.wasOnGround = player.onGround;
-                const oldVelY = player.velY; // Store vertical velocity before gravity is applied
+                const oldVelY = player.velY;
                 
-                // Gravity (Adjusted for better jump arc)
-                player.velY += 1.0; // Increased gravity from 0.8 to 1.0
+                player.velY += 1.0;
                 
-                // Drag in the air
                 if (!player.onGround) player.velX *= 0.98;
 
                 if (keys["a"]) player.facing = -1;
@@ -1191,7 +1072,6 @@
                 let moveSpeed = player.stats.speed;
                 const isMovingHorizontally = keys["a"] || keys["d"];
 
-                // Determine if sprinting
                 const isSprintingAttempt = keys["shift"] && player.stamina > 0 && isMovingHorizontally && !player.isBlocking;
                 const wasSprinting = player.isSprinting;
                 player.isSprinting = isSprintingAttempt && player.onGround && !player.isDashing;
@@ -1225,27 +1105,18 @@
                     player.velX *= 0.95;
                 }
                 
-                // --- MOVEMENT VFX ---
-                
-                // Sprint Dust Burst (Start of Sprint)
+                // Sprint dust
                 if (player.justStartedSprinting) {
-                    for(let i = 0; i < 15; i++) {
-                        createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
-                    }
+                    for(let i = 0; i < 10; i++) createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
                 }
-                
-                // Sprint Dust Trail
-                if (player.isSprinting && Math.random() < 0.4) { // 40% chance per frame to spawn a particle
-                    createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
-                }
-
+                if (player.isSprinting && Math.random() < 0.35) createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
 
                 if (keys[" "] && player.jumpCount < player.maxJumps) {
                     player.velY = -12;
-                    burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3); // UPDATED TO BURST
+                    burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3);
                     player.jumpCount++;
                     keys[" "] = false;
-                    player.onGround = false; // Player is no longer on the ground when jumping
+                    player.onGround = false;
                 }
 
                 player.x += player.velX;
@@ -1254,31 +1125,27 @@
                 
                 
                 if (player.y + player.h >= ground) {
-                    // Landing Dust
-                    if (!player.wasOnGround && oldVelY > 5) { // Check if we just landed and were falling fast enough
-                        for(let i = 0; i < 20; i++) {
-                            createDustParticle(player.x + player.w / 2, ground, 0);
-                        }
+                    if (!player.wasOnGround && oldVelY > 5) {
+                        for(let i = 0; i < 16; i++) createDustParticle(player.x + player.w / 2, ground, 0);
                         triggerScreenShake(3, 2);
                     }
 
                     player.y = ground - player.h;
                     player.velY = 0;
                     player.jumpCount = 0;
-                    player.onGround = true; // Player is on the ground
+                    player.onGround = true;
                 } else {
-                    player.onGround = false; // Player is in the air
+                    player.onGround = false;
                 }
                 
                 // --- DASHING & COMBAT ---
-
                 if (player.isDashing && npc.alive && !player.hasDashHit) {
                     let dashHitbox = { x: player.x, y: player.y, w: player.w, h: player.h };
                     let npcBox = getNPCBox();
 
                     if (rectCollide(dashHitbox, npcBox)) {
                         const dashPunchDamage = player.stats.strength * 2.5;
-                        dealDamageToNPC(dashPunchDamage, true, 12); // Heavy Knockback on Dash
+                        dealDamageToNPC(dashPunchDamage, true, 12);
 
                         player.velX = 0;
                         player.isDashing = false; 
@@ -1286,7 +1153,7 @@
                         player.hasDashHit = true;
 
                         player.attackTime = 10;
-                        triggerScreenShake(15, 8); // HEAVY SHAKE
+                        triggerScreenShake(15, 8);
                     }
                 }
                 
@@ -1333,9 +1200,7 @@
                 updateAbilityCooldowns();
                 updateCombatMetrics(); 
 
-                if (screenShakeTime > 0) {
-                    screenShakeTime--;
-                }
+                if (screenShakeTime > 0) screenShakeTime--;
                 camX += ((player.x - canvas.width / 2) - camX) * 0.08;
 
                 updateMainHUD();
@@ -1343,7 +1208,7 @@
                 updateCombatUI(); 
             }
 
-            // ===== UI UPDATES (MODIFIED FOR LOW HP FLASHING) =====
+            // ===== UI UPDATES (unchanged) =====
             function updateMainHUD() {
                 const hpRatio = player.hp / player.maxHp;
                 document.getElementById("hpBarInner").style.width = (hpRatio * 100) + "%";
@@ -1362,17 +1227,10 @@
                     document.getElementById("npcHpBarInner").style.width = (npc.hp / npc.maxHp * 100) + "%";
                 }
 
-                // NEW: Low HP Red Tint (Flashing)
                 let redTintOpacity = 0;
                 if (hpRatio < 0.3) {
-                    // 1. Base Opacity: increases from 0.0 to 0.08 as HP drops from 30% to 0%
                     let baseOpacity = (1 - (hpRatio / 0.3)) * 0.08; 
-                    
-                    // 2. Flashing Component (Sine wave based on time for smooth, steady flash)
-                    // 0.008 controls the speed of the flash
                     const flashComponent = (Math.sin(Date.now() * 0.008) + 1) / 2;
-                    
-                    // 3. Combine: Opacity oscillates around the base opacity. Max is 0.08 + 0.05 = 0.13
                     redTintOpacity = baseOpacity + (flashComponent * 0.05); 
                 }
                 document.getElementById('lowHpOverlay').style.backgroundColor = `rgba(255, 0, 0, ${redTintOpacity.toFixed(3)})`;
@@ -1419,32 +1277,28 @@
                 }
             }
 
-            // ===== DRAW LOOP (MODIFIED FOR PARALLAX AND FULL FLASH VFX + DIAMOND UI) =====
+            // ===== DRAW LOOP (modified zero-point diamond drawing smaller & true diamond shape) =====
             function draw() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
                 let shakeOffsetX = 0;
                 let shakeOffsetY = 0;
                 if (screenShakeTime > 0) {
-                    // Random offset based on intensity
                     shakeOffsetX = (Math.random() - 0.5) * shakeIntensity * 2;
                     shakeOffsetY = (Math.random() - 0.5) * shakeIntensity * 2;
                 }
 
                 const GROUND_Y_GLOBAL = canvas.height - 80;
 
-                // --- 1. DRAW PARALLAX BACKGROUND (Affected by shake, manually offset by camX) ---
+                // Parallax background (unchanged)
                 ctx.save(); 
                 ctx.translate(shakeOffsetX, shakeOffsetY);
-                
-                // Farthest Layer (0.1) - Dark Sky/Deep Background
                 const FAR_BG_FACTOR = 0.1;
                 ctx.fillStyle = "#000033"; 
                 let farX = (-camX * FAR_BG_FACTOR) % canvas.width;
                 ctx.fillRect(farX - canvas.width, 0, canvas.width, GROUND_Y_GLOBAL);
                 ctx.fillRect(farX, 0, canvas.width, GROUND_Y_GLOBAL);
 
-                // Mid Layer (0.3) - Blocky Structures (repeats every 500 units)
                 const MID_BG_FACTOR = 0.3;
                 ctx.fillStyle = "#0a0a55";
                 let midX = (-camX * MID_BG_FACTOR) % 500; 
@@ -1453,7 +1307,6 @@
                     ctx.fillRect(midX + i * 500 + 100, GROUND_Y_GLOBAL - 150, 80, 150);
                 }
                 
-                // Close Layer (0.6) - Pillars/Trees (repeats every 400 units)
                 const CLOSE_BG_FACTOR = 0.6;
                 ctx.fillStyle = "#151577";
                 let closeX = (-camX * CLOSE_BG_FACTOR) % 400; 
@@ -1461,18 +1314,16 @@
                     ctx.fillRect(closeX + i * 400, GROUND_Y_GLOBAL - 40, 30, 40);
                 }
                 
-                ctx.restore(); // End Parallax Draw
+                ctx.restore();
 
-                // --- 2. DRAW FOREGROUND (Affected by shake and full -camX translation) ---
+                // Foreground draw (unchanged)
                 ctx.save(); 
                 ctx.translate(shakeOffsetX, shakeOffsetY);
-                ctx.translate(-camX, 0); // Camera translation for foreground elements
+                ctx.translate(-camX, 0);
 
-                // GROUND (Moves 1:1 with camera)
                 ctx.fillStyle = "#222";
-                ctx.fillRect(camX - 1000, GROUND_Y_GLOBAL, canvas.width + 2000, 80); // Draw a very long ground bar
-                
-                // AFTERIMAGES
+                ctx.fillRect(camX - 1000, GROUND_Y_GLOBAL, canvas.width + 2000, 80);
+
                 for (let img of afterimages) {
                     ctx.fillStyle = img.color;
                     ctx.globalAlpha = img.life / 15 * 0.5;
@@ -1480,23 +1331,18 @@
                 }
                 ctx.globalAlpha = 1;
 
-                // NPC
                 if (npc.alive) {
                     const npcDrawY = npc.isAirborne ? npc.y : GROUND_Y_GLOBAL - npc.h;
-                    
-                    // --- VFX: HIT FLASH DRAWING ---
                     if (npc.hitFlashTimer > 0) {
-                        ctx.fillStyle = "#ffffff"; // Pure white flash
+                        ctx.fillStyle = "#ffffff";
                         ctx.shadowBlur = 20;
                         ctx.shadowColor = "white";
                     } else {
-                        ctx.fillStyle = "#f33"; // Normal Color
+                        ctx.fillStyle = "#f33";
                         ctx.shadowBlur = 0;
                     }
-
                     ctx.fillRect(npc.x, npcDrawY, npc.w, npc.h);
-                    ctx.shadowBlur = 0; // Reset shadow
-                    
+                    ctx.shadowBlur = 0;
                     if(npc.isAirborne) {
                         ctx.strokeStyle = "#ffffff";
                         ctx.lineWidth = 1;
@@ -1509,7 +1355,6 @@
                     }
                 }
 
-                // PLAYER
                 ctx.fillStyle = "#4af";
                 if (player.invincible) {
                     ctx.fillStyle = "#00ffff";
@@ -1538,21 +1383,17 @@
                     ctx.globalAlpha = 1;
                 }
 
-
-                // ATTACK HITBOX
                 if (player.attackTime > 0) {
                     let hitbox = getAttackBox();
                     ctx.fillStyle = "rgba(255,255,255,0.3)";
                     ctx.fillRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
                 }
 
-                // PARTICLES
                 for (let p of particles) {
                     ctx.fillStyle = p.color;
                     ctx.fillRect(p.x, p.y, p.size, p.size);
                 }
 
-                // COMPLEX VFX
                 for (let vfx of vfxQueue) {
                     ctx.globalAlpha = vfx.life / (vfx.life > 20 ? 30 : 10);
                     if (vfx.type === 'shockwave') {
@@ -1578,28 +1419,25 @@
                          ctx.beginPath();
                          ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2);
                          ctx.fill();
-                    } else if (vfx.type === 'impactRing') { // NEW RING EFFECT
+                    } else if (vfx.type === 'impactRing') {
                          ctx.strokeStyle = vfx.color;
                          ctx.lineWidth = 3;
-                         const size = vfx.size + (50 * (1 - vfx.life / 10)); // Expands
+                         const size = vfx.size + (50 * (1 - vfx.life / 10));
                          ctx.beginPath();
                          ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2);
                          ctx.stroke();
                     } else if (vfx.type === 'zeroImpact') {
-                        // heavy black core with white bloom
                         const lifePct = vfx.life / 18;
-                        // black fade
                         ctx.save();
                         ctx.globalAlpha = 0.85 * lifePct;
                         ctx.fillStyle = vfx.color;
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         ctx.restore();
-                        // white bloom center
                         ctx.save();
                         ctx.globalCompositeOperation = 'lighter';
                         const centerAlpha = 1 - lifePct;
                         ctx.globalAlpha = centerAlpha * 0.9;
-                        const maxR = Math.max(canvas.width, canvas.height) * 0.6 * (vfx.intensity || 1);
+                        const maxR = Math.max(canvas.width, canvas.height) * 0.35 * (vfx.intensity || 1);
                         ctx.beginPath();
                         ctx.fillStyle = "#ffffff";
                         ctx.arc(canvas.width/2, canvas.height/2, maxR * (1 - lifePct*0.5), 0, Math.PI*2);
@@ -1609,7 +1447,6 @@
                 }
                 ctx.globalAlpha = 1;
 
-                // DAMAGE NUMBERS
                 ctx.font = "bold 18px Arial";
                 ctx.textAlign = "center";
                 for (let d of damageNumbers) {
@@ -1623,76 +1460,89 @@
                 }
                 ctx.globalAlpha = 1;
 
-                ctx.restore(); // End Foreground Draw
+                ctx.restore();
                 
-                // --- 3. DRAW SCREEN VFX (No translation, no shake) ---
+                // Screen flash vfx
                 for (let i = vfxQueue.length - 1; i >= 0; i--) {
                     const vfx = vfxQueue[i];
                     if (vfx.type === 'fullFlash') {
                         ctx.save();
-                        ctx.globalAlpha = vfx.life / 5; // Quick fade
+                        ctx.globalAlpha = vfx.life / 5;
                         ctx.fillStyle = vfx.color;
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         ctx.restore();
                     }
                 }
 
-                // --- 4. DRAW ZERO-POINT DIAMOND UI (screen space, not translated by camera) ---
+                // --- DRAW ZERO-POINT DIAMOND UI (much smaller diamond shape) ---
                 if (zeroPoint.active || zeroPoint.charged) {
                     const cx = canvas.width / 2;
                     const cy = canvas.height / 2 - 80;
-                    const size = 120;
+                    // much smaller size for diamond
+                    const size = 36; // half width of diamond (distance from center to each point)
                     const progress = Math.min(1, zeroPoint.timer / zeroPoint.duration);
-                    // aura glow
+
+                    // small aura
                     ctx.save();
-                    // pulsating red aura
-                    const auraAlpha = zeroPoint.charged ? 0.9 : 0.35 + Math.sin(Date.now() * 0.02) * 0.15;
+                    const auraAlpha = zeroPoint.charged ? 0.9 : 0.25 + Math.sin(Date.now() * 0.03) * 0.12;
                     ctx.globalAlpha = auraAlpha;
                     ctx.fillStyle = '#8b0000';
                     ctx.beginPath();
-                    ctx.ellipse(cx, cy, size * (1.4 + (zeroPoint.charged ? 0.5 : 0.1)), size * (1.4 + (zeroPoint.charged ? 0.5 : 0.1)), 0, 0, Math.PI*2);
+                    ctx.ellipse(cx, cy, size * (1.0 + (zeroPoint.charged ? 0.3 : 0.1)), size * (1.0 + (zeroPoint.charged ? 0.3 : 0.1)), 0, 0, Math.PI*2);
                     ctx.fill();
                     ctx.globalAlpha = 1;
 
-                    // outer rotating diamond (just drawn rotated)
-                    ctx.translate(cx, cy);
-                    ctx.rotate(Math.PI/4 + (Date.now() * 0.001));
-                    ctx.lineWidth = 6;
-                    ctx.strokeStyle = zeroPoint.charged ? '#ff4444' : '#ff0000';
-                    ctx.strokeRect(-size/2, -size/2, size, size);
-                    // inner fill representing charge progress (scaled square)
-                    const innerMax = size - 16;
-                    const innerSize = innerMax * progress;
-                    ctx.fillStyle = zeroPoint.charged ? '#ffaaaa' : '#550000';
-                    ctx.fillRect(-innerSize/2, -innerSize/2, innerSize, innerSize);
-
-                    // small inner border to mimic the image style
-                    ctx.lineWidth = 2;
+                    // draw diamond shape (rotated square visual) — create diamond by four points
+                    const diamondColor = zeroPoint.charged ? '#ff6666' : '#a60000';
+                    ctx.fillStyle = diamondColor;
                     ctx.strokeStyle = '#000';
-                    ctx.strokeRect(-innerSize/2, -innerSize/2, innerSize, innerSize);
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    // top
+                    ctx.moveTo(cx, cy - size);
+                    // right
+                    ctx.lineTo(cx + size, cy);
+                    // bottom
+                    ctx.lineTo(cx, cy + size);
+                    // left
+                    ctx.lineTo(cx - size, cy);
+                    ctx.closePath();
+                    // inner fill scaled by progress (smaller inner diamond)
+                    ctx.fill();
+                    ctx.stroke();
 
-                    ctx.rotate(-Math.PI/4 - (Date.now() * 0.001));
-                    ctx.translate(-cx, -cy);
+                    // inner progress diamond (charge)
+                    const innerSize = size * (0.12 + 0.88 * progress); // small when starting, grows with charge
+                    ctx.fillStyle = zeroPoint.charged ? '#fff0f0' : '#330000';
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy - innerSize);
+                    ctx.lineTo(cx + innerSize, cy);
+                    ctx.lineTo(cx, cy + innerSize);
+                    ctx.lineTo(cx - innerSize, cy);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
 
-                    // center icon suggestion (like a target)
+                    // tiny center core
                     ctx.fillStyle = '#000';
                     ctx.globalAlpha = 0.6;
                     ctx.beginPath();
-                    ctx.arc(cx, cy, 8, 0, Math.PI*2);
+                    ctx.arc(cx, cy, 3, 0, Math.PI*2);
                     ctx.fill();
                     ctx.globalAlpha = 1;
 
-                    // text prompt (use DOM hint too)
+                    // small text below diamond (smaller font)
                     ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 14px Arial';
+                    ctx.font = zeroPoint.charged ? 'bold 12px Arial' : '12px Arial';
                     ctx.textAlign = 'center';
                     if (!zeroPoint.charged) {
-                        ctx.fillText('Charging...', cx, cy + size/1.6);
+                        ctx.fillText('Charging...', cx, cy + size + 18);
                     } else {
-                        ctx.fillText('Zero-Point Ready!', cx, cy + size/1.6);
+                        ctx.fillText('Zero-Point Ready', cx, cy + size + 18);
                     }
 
                     ctx.restore();
+                    document.getElementById('zeroPointHint').style.display = 'block';
                 } else {
                     document.getElementById('zeroPointHint').style.display = 'none';
                 }
