@@ -7,13 +7,122 @@
                 margin: 0;
                 overflow: hidden;
                 background: #111;
+                font-family: Arial, sans-serif;
             }
 
             canvas {
                 display: block;
             }
 
-            /* Main HUD Bar (Health, Energy, XP) */
+            /* --- NEW: Dialogue Box --- */
+            #dialogueBox {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 120px;
+                background: linear-gradient(0deg, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.7));
+                color: #fff;
+                padding: 15px 30px;
+                box-sizing: border-box;
+                z-index: 100;
+                border-top: 2px solid #0ff;
+                display: none; /* Controlled by JS */
+            }
+
+            #dialogueText {
+                font-size: 16px;
+                line-height: 1.4;
+                margin-bottom: 5px;
+            }
+
+            #dialogueSpeaker {
+                font-weight: bold;
+                color: #0ff;
+                font-size: 18px;
+                margin-bottom: 5px;
+            }
+            #dialogueContinue {
+                font-size: 12px;
+                color: #aaa;
+                text-align: right;
+                opacity: 0.8;
+                float: right;
+                animation: blink 1s step-start infinite;
+            }
+            @keyframes blink { 50% { opacity: 0; } }
+
+            /* --- NEW: Quest Tracker --- */
+            #questTracker {
+                position: fixed;
+                top: 10px;
+                right: 250px;
+                padding: 10px 15px;
+                background: rgba(10, 10, 30, 0.8);
+                border: 1px solid #0ff;
+                color: #fff;
+                font-size: 14px;
+                z-index: 10;
+                box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+                display: none; /* Only show in combat state */
+            }
+            #questTitle {
+                font-weight: bold;
+                color: #0ff;
+                margin-bottom: 5px;
+                font-size: 16px;
+            }
+
+            /* --- NEW: Tutorial Bar (Bottom Center) --- */
+            #tutorialBar {
+                position: fixed;
+                bottom: 140px; /* Above dialogue box area */
+                left: 50%;
+                transform: translateX(-50%);
+                width: 70%;
+                background: rgba(20, 20, 50, 0.85);
+                border: 1px solid #4af;
+                color: #fff;
+                padding: 8px 15px;
+                text-align: center;
+                border-radius: 4px;
+                font-size: 12px;
+                z-index: 90;
+                box-shadow: 0 0 15px rgba(68, 170, 255, 0.3);
+                opacity: 0; /* Control visibility with opacity and transition */
+                transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            }
+            .tutorialKey {
+                background: #444;
+                border: 1px solid #777;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-weight: bold;
+                color: #0ff;
+                box-shadow: 0 1px 3px #000;
+                margin: 0 3px;
+            }
+            
+            /* --- NEW: Whisper Effect --- */
+            #whispers {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #ff00ff;
+                font-family: 'Times New Roman', serif;
+                font-size: 30px;
+                font-style: italic;
+                font-weight: bold;
+                text-shadow: 0 0 10px #ff00ff;
+                opacity: 0;
+                transition: opacity 2s ease-out;
+                z-index: 70;
+                pointer-events: none;
+            }
+
+
+            /* Existing styles */
             #mainHud {
                 position: fixed;
                 top: 10px;
@@ -96,7 +205,7 @@
             }
             
             /* NPC HP Bar */
-            #npcHpBar {
+            #npcHpBar { /* Renaming this to guardianHpBar in JS */
                 position: fixed;
                 top: 10px;
                 right: 10px;
@@ -105,6 +214,15 @@
                 background: #222;
                 border: 2px solid #f33;
                 display: none;
+            }
+            #npcHpBarTitle {
+                position: absolute;
+                top: -20px;
+                right: 0;
+                color: #f33;
+                font-weight: bold;
+                font-size: 14px;
+                text-shadow: 0 0 5px #f33;
             }
 
             #npcHpBarInner {
@@ -316,7 +434,13 @@
         </div>
         
         <div id="npcHpBar">
+            <div id="npcHpBarTitle">Rift Guardian</div>
             <div id="npcHpBarInner"></div>
+        </div>
+
+        <div id="questTracker">
+            <div id="questTitle">Current Quest:</div>
+            <div id="questText">...</div>
         </div>
 
         <div id="abilityBar">
@@ -373,8 +497,19 @@
             <p style="margin-top: 15px; color: #aaa;">Press 'C' to Close.</p>
         </div>
 
+        <div id="dialogueBox">
+            <div id="dialogueSpeaker"></div>
+            <div id="dialogueText"></div>
+            <div id="dialogueContinue">Press SPACE to Continue</div>
+        </div>
+
+        <div id="tutorialBar"></div>
+        
+        <div id="whispers"></div>
+
         <script>
-            // ===== CANVAS & CONTEXT SETUP =====
+            // ===== GAME STATE & CORE SETUP =====
+            let gameState = 'dialogue'; // 'dialogue', 'combat', 'scene2'
             const canvas = document.getElementById("gameCanvas");
             const ctx = canvas.getContext("2d");
             canvas.width = innerWidth;
@@ -384,7 +519,7 @@
                 canvas.height = innerHeight;
             });
             
-            // ===== PLAYER STATS =====
+            // ===== PLAYER STATS (unchanged) =====
             const player = {
                 x: 0,
                 y: 0,
@@ -419,7 +554,6 @@
                     energy: 100,
                     reflectDamage: 0
                 },
-                // NEW: Variables for tracking ground state and sprinting
                 onGround: false,
                 wasOnGround: false,
                 isSprinting: false,
@@ -427,7 +561,7 @@
                 alive: true
             };
 
-            // ===== COMBAT METRICS =====
+            // ===== COMBAT METRICS (unchanged) =====
             const combatMetrics = {
                 totalDamage: 0,
                 damageLog: [],
@@ -442,7 +576,7 @@
                 return 100 + (level - 1) * 50; 
             }
 
-            // ===== CHARACTER CREATOR/BUILD SELECTION =====
+            // ===== CHARACTER CREATOR/BUILD SELECTION (unchanged) =====
             const savedBuild = localStorage.getItem('fracture_charbuild') || 'Strength';
             
             const buildStats = {
@@ -469,32 +603,42 @@
             document.getElementById("name4").innerText = "Dash/Punch";
             document.getElementById("abilityTitle").innerHTML = `${savedBuild} Build Active / **DASH (Q)** / **BLOCK (F)**`;
 
-            // ===== NPC ===== 
-            const npc = {
-                x: 400,
+            // ===== RIFT GUARDIAN (Refactored NPC) ===== 
+            const riftGuardian = {
+                x: 400, // Initial position, updated by game loop to be on the right
                 y: 0,
-                w: 40,
-                h: 60,
-                hp: 300,
-                maxHp: 300,
+                w: 60, // Slightly bigger
+                h: 80, // Slightly bigger
+                hp: 500, // More health for a boss fight
+                maxHp: 500,
                 alive: true,
-                xpValue: 50,
+                xpValue: 100,
                 isAirborne: false,
                 airborneVelY: 0,
                 airborneLife: 0,
-                // NEW: Physics & Visuals
                 velX: 0,
-                hitFlashTimer: 0
+                hitFlashTimer: 0,
+                // NEW: Guardian specific attack timer
+                attackCooldown: 120 
             };
             const GROUND_Y = canvas.height - 80;
+            riftGuardian.x = canvas.width - riftGuardian.w - 50; // Set initial position to the right
 
-            // ===== INPUT =====
+            // ===== INPUT (updated for dialogue) =====
             const keys = {};
-            document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+            document.addEventListener("keydown", e => {
+                if (gameState === 'dialogue' && e.key === ' ') {
+                    e.preventDefault();
+                    advanceDialogue();
+                    return;
+                }
+                keys[e.key.toLowerCase()] = true;
+            });
             document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+            
             let mouseDown = false;
             canvas.addEventListener("mousedown", (e) => {
-                if (e.button === 0) mouseDown = true;
+                if (e.button === 0 && gameState === 'combat') mouseDown = true;
             });
             canvas.addEventListener("mouseup", (e) => {
                 if (e.button === 0) mouseDown = false;
@@ -502,6 +646,7 @@
 
             let menuOpen = false;
             document.addEventListener("keydown", (e) => {
+                if (gameState !== 'combat') return; 
                 if (e.key.toLowerCase() === "c") {
                     menuOpen = !menuOpen;
                     document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
@@ -520,7 +665,7 @@
                  }
             });
 
-            // ===== VFX ARRAYS =====
+            // ===== VFX ARRAYS (unchanged) =====
             const damageNumbers = [];
             const particles = [];
             const afterimages = []; 
@@ -530,23 +675,22 @@
             let screenShakeTime = 0;
             let shakeIntensity = 0;
 
-            // ZERO-POINT IMPACT State
+            // ZERO-POINT IMPACT State (unchanged)
             const zeroPoint = {
-                active: false,         // diamond visible and charging
-                timer: 0,              // frames since started
-                duration: 120,         // frames to full charge (approx 2s at 60fps)
-                charged: false,        // fully charged and waiting to be used via punch
-                cooldown: 0,           // frames until zero point can be started again
-                cooldownMax: 300       // a short cooldown after use
+                active: false,
+                timer: 0,
+                duration: 120,
+                charged: false,
+                cooldown: 0,
+                cooldownMax: 300
             };
 
-            // INCREASED INTENSITY FOR HEAVIER SHAKE
             function triggerScreenShake(duration = 8, intensity = 6) { 
                 screenShakeTime = duration;
                 shakeIntensity = intensity;
             }
 
-            // ===== XP & LEVEL UP =====
+            // ===== XP & LEVEL UP (unchanged) =====
             function gainXP(amount) {
                 if (!player.alive) return;
                 player.xp += amount;
@@ -566,8 +710,8 @@
                 player.hp = player.maxHp;
                 player.energy = player.stats.energy;
 
-                triggerScreenShake(30, 15); // HEAVY SHAKE FOR LEVEL UP
-                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#f0f", 80, 20); // MORE PARTICLES
+                triggerScreenShake(30, 15);
+                burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#f0f", 80, 20);
                 createDamageNumber("LEVEL UP!", player.x + player.w / 2, player.y - 40, "#f0f");
             }
 
@@ -587,7 +731,7 @@
                 updateStatsMenu();
             }
 
-            // ===== VFX HELPERS =====
+            // ===== VFX HELPERS (unchanged) =====
             function createDamageNumber(amount, x, y, color = "#ffffff") {
                 damageNumbers.push({
                     text: Math.ceil(amount).toString(),
@@ -611,7 +755,6 @@
                 });
             }
 
-            // INCREASED PARTICLE COUNT FOR BURST
             function burstParticles(x, y, color, count = 20, power = 4) {
                 for (let i = 0; i < count; i++) {
                     particles.push({
@@ -625,7 +768,6 @@
                 }
             }
             
-            // NEW: Dust Particle for movement/landing
             function createDustParticle(x, y, directionX) {
                 particles.push({
                     x: x + Math.random() * 10 - 5,
@@ -634,19 +776,17 @@
                     velX: (Math.random() * 2 - 1) + directionX * 1.5,
                     velY: Math.random() * -2,
                     life: 15,
-                    color: "#997755" // Brown/Dust color
+                    color: "#997755"
                 });
             }
 
-            // NEW: Directional Burst (Sparks/Blood fly away from hit)
             function directionalBurst(x, y, color, count, directionX, spread = 0.5) {
                 for (let i = 0; i < count; i++) {
                     particles.push({
                         x, y,
                         size: Math.random() * 4 + 2,
-                        // Velocity biased towards directionX
-                        velX: (directionX * (Math.random() * 8 + 4)) + (Math.random() * 2 - 1), // Increased velocity
-                        velY: (Math.random() * -8) + 4, // Increased vertical velocity
+                        velX: (directionX * (Math.random() * 8 + 4)) + (Math.random() * 2 - 1),
+                        velY: (Math.random() * -8) + 4,
                         life: 25,
                         color
                     });
@@ -661,23 +801,20 @@
                 });
             }
             
-            // NEW: Full-Screen Flash VFX
             function triggerFullFlash(color = "#ffffff", duration = 5) {
                 vfxQueue.push({ type: 'fullFlash', life: duration, color: color });
             }
 
-            // NEW: Zero-Point Impact trigger - shared visual & damage routine
+            // Updated Zero-Point impact trigger to use riftGuardian
             function triggerZeroPointImpactFromMultiplier(multiplier) {
-                // multiplier: amplification factor (e.g. 2.5 - 3.0)
-                // Strong visuals: black flash with white core, extreme screen shake, particles and shockwave
                 const base = player.stats.strength * 1.5;
                 const finalDamage = base * multiplier;
 
-                const dist = Math.abs((player.x + player.w/2) - (npc.x + npc.w/2));
+                const dist = Math.abs((player.x + player.w/2) - (riftGuardian.x + riftGuardian.w/2));
                 const range = 600;
-                if (npc.alive && dist < range) {
+                if (riftGuardian.alive && dist < range) {
                     const knockback = 30 * multiplier;
-                    dealDamageToNPC(finalDamage, true, knockback);
+                    dealDamageToGuardian(finalDamage, true, knockback);
                 }
 
                 vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: multiplier });
@@ -690,18 +827,18 @@
                 zeroPoint.cooldown = zeroPoint.cooldownMax;
             }
 
-            // ===== COMBAT SYSTEM (unchanged) =====
+            // ===== COMBAT SYSTEM (Updated to use riftGuardian) =====
             function rectCollide(a, b) {
                 return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + a.h && a.y + a.h > b.y;
             }
 
-            function getNPCBox() {
+            function getNPCBox() { // Renamed internally for clarity
                 const ground = GROUND_Y;
                 return {
-                    x: npc.x,
-                    y: npc.isAirborne ? npc.y : ground - npc.h,
-                    w: npc.w,
-                    h: npc.h
+                    x: riftGuardian.x,
+                    y: riftGuardian.isAirborne ? riftGuardian.y : ground - riftGuardian.h,
+                    w: riftGuardian.w,
+                    h: riftGuardian.h
                 };
             }
 
@@ -715,12 +852,12 @@
                 };
             }
 
-            function dealDamageToNPC(amount, isAbility = false, knockbackForce = 0) {
-                let npcBox = getNPCBox();
+            function dealDamageToGuardian(amount, isAbility = false, knockbackForce = 0) {
+                let guardianBox = getNPCBox();
                 let hitbox = getAttackBox();
                 let finalDmg = amount;
 
-                if (rectCollide(hitbox, npcBox) && npc.alive) {
+                if (rectCollide(hitbox, guardianBox) && riftGuardian.alive) {
                     let dmgColor = isAbility ? "#00ffff" : "#ffffff";
                     let isCrit = Math.random() < 0.1;
                     if (isCrit) {
@@ -729,17 +866,17 @@
                     }
                     if (player.berserkMode) finalDmg *= 1.25;
 
-                    npc.hp -= finalDmg;
+                    riftGuardian.hp -= finalDmg;
 
-                    let knockDir = (player.x + player.w/2 < npc.x + npc.w/2) ? 1 : -1;
-                    npc.velX = knockDir * knockbackForce;
+                    let knockDir = (player.x + player.w/2 < riftGuardian.x + riftGuardian.w/2) ? 1 : -1;
+                    riftGuardian.velX = knockDir * knockbackForce;
 
-                    npc.hitFlashTimer = 6;
+                    riftGuardian.hitFlashTimer = 6;
 
-                    directionalBurst(npcBox.x + npcBox.w/2, npcBox.y + npcBox.h/2, "#fff", 15, knockDir);
-                    directionalBurst(npcBox.x + npcBox.w/2, npcBox.y + npcBox.h/2, "#ff0000", 10, knockDir / 4, 8);
+                    directionalBurst(guardianBox.x + guardianBox.w/2, guardianBox.y + guardianBox.h/2, "#fff", 15, knockDir);
+                    directionalBurst(guardianBox.x + guardianBox.w/2, guardianBox.y + guardianBox.h/2, "#ff0000", 10, knockDir / 4, 8);
 
-                    vfxQueue.push({ type: 'impactRing', x: npcBox.x + npcBox.w/2, y: npcBox.y + npcBox.h/2, color: "#fff", life: 10, size: 5 });
+                    vfxQueue.push({ type: 'impactRing', x: guardianBox.x + guardianBox.w/2, y: guardianBox.y + guardianBox.h/2, color: "#fff", life: 10, size: 5 });
 
                     combatMetrics.totalDamage += finalDmg;
                     combatMetrics.damageLog.push({ time: Date.now(), damage: finalDmg });
@@ -755,17 +892,18 @@
                     if (isAbility) triggerScreenShake(15, 10);
                     else triggerScreenShake(8, 4);
 
-                    createDamageNumber(finalDmg, npcBox.x + npcBox.w / 2, npcBox.y, dmgColor);
+                    createDamageNumber(finalDmg, guardianBox.x + guardianBox.w / 2, guardianBox.y, dmgColor);
                     document.getElementById("npcHpBar").style.display = "block";
                     
-                    if (npc.hp <= 0 && npc.alive) {
-                        npc.alive = false;
-                        gainXP(npc.xpValue);
-                        combatMetrics.comboCount = 0;
-                        burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#f00", 80, 15);
-                        triggerScreenShake(20, 15);
-                        triggerFullFlash("#ffffff", 5);
+                    if (riftGuardian.hp <= 0 && riftGuardian.alive) {
+                        riftGuardian.alive = false;
+                        transitionToScene2(); 
                     }
+                    
+                    // Progress tutorial
+                    if (currentTutorialStep === 0 && finalDmg > 0) nextTutorialStep();
+                    if (currentTutorialStep === 1 && player.isDashing) nextTutorialStep();
+                    if (currentTutorialStep === 2 && zeroPoint.charged) nextTutorialStep();
                 }
             }
 
@@ -773,15 +911,17 @@
                 if (player.invincible) return;
 
                 let incomingDmg = amount;
-                let npcDir = (player.x + player.w/2 < npc.x + npc.w/2) ? 1 : -1; 
+                let guardianDir = (player.x + player.w/2 < riftGuardian.x + riftGuardian.w/2) ? 1 : -1; 
                 
                 if (player.isBlocking) {
                     incomingDmg *= 0.1;
                     createDamageNumber("Block!", player.x + player.w / 2, player.y - 10, "#888");
-                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#00ccff", 10, -npcDir);
+                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#00ccff", 10, -guardianDir);
+                    // Progress tutorial
+                    if (currentTutorialStep === 3) nextTutorialStep();
                 } else {
                     triggerScreenShake(10, 5);
-                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#ffaa00", 15, -npcDir);
+                    directionalBurst(player.x + player.w/2, player.y + player.h/2, "#ffaa00", 15, -guardianDir);
                 }
 
                 incomingDmg = incomingDmg - player.stats.defense;
@@ -789,35 +929,49 @@
 
                 if (player.stats.reflectDamage > 0) {
                     let reflectedDmg = incomingDmg * player.stats.reflectDamage;
-                    dealDamageToNPC(reflectedDmg, true, 2); 
-                    createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", npc.x + npc.w / 2, npc.y - 10, "#00ff00");
+                    dealDamageToGuardian(reflectedDmg, true, 2); 
+                    createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", riftGuardian.x + riftGuardian.w / 2, riftGuardian.y - 10, "#00ff00");
                 }
 
                 player.hp -= incomingDmg;
                 if (player.hp < 0) player.hp = 0;
                 
                 if (!player.isBlocking) {
-                    player.x += -npcDir * 10;
-                    player.velX = -npcDir * 5;
+                    player.x += -guardianDir * 10;
+                    player.velX = -guardianDir * 5;
                 }
             }
             
-            setInterval(() => {
-                if (npc.alive && !menuOpen) {
-                    if (Math.abs(player.x - npc.x) < 100) {
-                        dealDamageToPlayer(15);
-                    }
-                }
-                if (!npc.alive) {
-                    npc.hp = npc.maxHp;
-                    npc.alive = true;
-                    document.getElementById("npcHpBar").style.display = "none";
-                    npc.x = 400;
-                }
-            }, 2000);
+            // Replaced periodic NPC attack with a proper Guardian AI loop
+            function guardianAI() {
+                if (!riftGuardian.alive || gameState !== 'combat') return;
 
+                const distance = Math.abs(player.x - riftGuardian.x);
+                const guardianDir = (player.x < riftGuardian.x) ? -1 : 1;
+                
+                if (riftGuardian.attackCooldown > 0) {
+                    riftGuardian.attackCooldown--;
+                    return;
+                }
 
-            // ===================== ABILITIES (unchanged) =====================
+                if (distance < 100) {
+                    // Close range attack
+                    dealDamageToPlayer(20);
+                    riftGuardian.attackCooldown = 90;
+                    riftGuardian.velX = -guardianDir * 5; // Slight step-back
+                    triggerScreenShake(5, 3);
+                } else if (distance < 300) {
+                    // Charge attack
+                    riftGuardian.velX = guardianDir * 10;
+                    riftGuardian.attackCooldown = 150;
+                } else {
+                    // Move closer
+                    riftGuardian.velX = guardianDir * 2;
+                }
+            }
+            setInterval(guardianAI, 16); // Run AI on a timed interval
+
+            // Updated universalPunch to use riftGuardian
             function universalPunch() {
                 if (player.attackCooldown <= 0) {
                     player.attackTime = 10;
@@ -845,44 +999,48 @@
                         damage *= mul;
                         knockback *= mul * 6;
                         vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: mul });
-                        burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ffffff", Math.max(20, 40 * mul), 18 * mul);
+                        burstParticles(player.x + player.w/2, player.y + player.h/2, "#ffffff", Math.max(20, 40 * mul), 18 * mul);
                         triggerScreenShake(30, 20 * mul);
                         triggerFullFlash("#ffffff", 4);
+                        
+                        // Progress tutorial
+                        if (currentTutorialStep === 2) nextTutorialStep();
+
                         zeroPoint.charged = false;
                         zeroPoint.active = false;
                         zeroPoint.timer = 0;
                         zeroPoint.cooldown = zeroPoint.cooldownMax;
                     }
 
-                    dealDamageToNPC(damage, false, knockback);
+                    dealDamageToGuardian(damage, false, knockback);
                     
-                    let npcBox = getNPCBox();
+                    let guardianBox = getNPCBox();
                     let hitbox = getAttackBox();
 
-                    if (rectCollide(hitbox, npcBox) && npc.alive) {
+                    if (rectCollide(hitbox, guardianBox) && riftGuardian.alive) {
                         if (moveType === 'Uppercut') {
-                            vfxQueue.push({ type: 'shockwave', x: npc.x + npc.w / 2, y: npc.y + npc.h / 2, color: "#ffffff", life: 15, radius: 10, maxRadius: 150 });
-                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#fff", 80, 15);
+                            vfxQueue.push({ type: 'shockwave', x: riftGuardian.x + riftGuardian.w / 2, y: riftGuardian.y + riftGuardian.h / 2, color: "#ffffff", life: 15, radius: 10, maxRadius: 150 });
+                            burstParticles(riftGuardian.x + riftGuardian.w / 2, riftGuardian.y + riftGuardian.h / 2, "#fff", 80, 15);
                             triggerScreenShake(15, 8);
 
-                            npc.isAirborne = true;
-                            npc.airborneVelY = -25;
-                            npc.airborneLife = 30;
-                            npc.velX = 0;
+                            riftGuardian.isAirborne = true;
+                            riftGuardian.airborneVelY = -25;
+                            riftGuardian.airborneLife = 30;
+                            riftGuardian.velX = 0;
                             
                             player.velY = -15; 
                             player.jumpCount = player.maxJumps; 
                         } else if (moveType === 'Downslam') {
-                            vfxQueue.push({ type: 'shockwave', x: npc.x + npc.w / 2, y: GROUND_Y, color: "#ff0000", life: 30, radius: 20, maxRadius: 800 });
-                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#ff0000", 120, 20);
+                            vfxQueue.push({ type: 'shockwave', x: riftGuardian.x + riftGuardian.w / 2, y: GROUND_Y, color: "#ff0000", life: 30, radius: 20, maxRadius: 800 });
+                            burstParticles(riftGuardian.x + riftGuardian.w / 2, riftGuardian.y + riftGuardian.h / 2, "#ff0000", 120, 20);
                             triggerScreenShake(30, 20);
 
-                            npc.isAirborne = false; 
-                            npc.airborneLife = 0;
-                            npc.y = GROUND_Y - npc.h;
-                            npc.velX = 0;
+                            riftGuardian.isAirborne = false; 
+                            riftGuardian.airborneLife = 0;
+                            riftGuardian.y = GROUND_Y - riftGuardian.h;
+                            riftGuardian.velX = 0;
                             
-                            vfxQueue.push({ type: 'impactFlash', x: npc.x + npc.w / 2, y: GROUND_Y, color: "#ffaa00", life: 10 });
+                            vfxQueue.push({ type: 'impactFlash', x: riftGuardian.x + riftGuardian.w / 2, y: GROUND_Y, color: "#ffaa00", life: 10 });
 
                             player.velY = 0;
                             player.y = GROUND_Y - player.h;
@@ -893,7 +1051,7 @@
             }
 
 
-            // UNIVERSAL DASH 
+            // UNIVERSAL DASH (Updated to use riftGuardian for hit detection)
             function dashMove() {
                 if (abilityCooldowns[3] > 0 || player.stamina < 30 || player.isDashing) return;
                 
@@ -919,26 +1077,26 @@
             function speed_ability1() { } 
             function speed_ability2() { if (abilityCooldowns[1] > 0) return; abilityCooldowns[1] = 90; player.jumpCount = 0; player.velY = -12; burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3); }
             function speed_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 20) return; player.energy -= 20; abilityCooldowns[2] = 180; player.invincible = true; triggerScreenShake(15, 10); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 50, 15); setTimeout(()=>player.invincible=false,1000); }
-            function strength_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 30) return; player.energy -= 30; abilityCooldowns[0] = 90; let dmg = player.stats.strength * 2.5; dealDamageToNPC(dmg, true, 20); burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12); vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500}); triggerScreenShake(20,15); }
-            function strength_ability2() { if (abilityCooldowns[1] > 0 || player.stamina < 40) return; player.stamina -= 40; abilityCooldowns[1] = 60; let hits = 4; let dmgPerHit = player.stats.strength * 0.7; for (let i=0;i<hits;i++) setTimeout(()=>{dealDamageToNPC(dmgPerHit,true,3); createAfterimage(player.x+player.w,player.y,10,player.h,"#ff880055");}, i*100); }
+            function strength_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 30) return; player.energy -= 30; abilityCooldowns[0] = 90; let dmg = player.stats.strength * 2.5; dealDamageToGuardian(dmg, true, 20); burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12); vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500}); triggerScreenShake(20,15); }
+            function strength_ability2() { if (abilityCooldowns[1] > 0 || player.stamina < 40) return; player.stamina -= 40; abilityCooldowns[1] = 60; let hits = 4; let dmgPerHit = player.stats.strength * 0.7; for (let i=0;i<hits;i++) setTimeout(()=>{dealDamageToGuardian(dmgPerHit,true,3); createAfterimage(player.x+player.w,player.y,10,player.h,"#ff880055");}, i*100); }
             function strength_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 50) return; player.energy -= 50; abilityCooldowns[2] = 240; player.berserkMode = true; player.stats.defense = -5; burstParticles(player.x+player.w/2,player.y+player.h/2,"#ff5555",80,20); triggerScreenShake(25,18); setTimeout(()=>{player.berserkMode=false; player.stats.defense = buildStats[savedBuild].def; burstParticles(player.x+player.w/2,player.y+player.h/2,"#55ff55",50,12);},4000); }
             function defense_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[0] = 120; player.stats.defense += 10; burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#0000ff", 30, 8); setTimeout(()=>player.stats.defense -= 10,2000); }
             function defense_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 20) return; player.energy -= 20; abilityCooldowns[1] = 180; let heal = player.maxHp * 0.15; player.hp = Math.min(player.maxHp, player.hp + heal); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ff00", 40, 10); createDamageNumber(heal.toFixed(0) + " Heal", player.x + player.w / 2, player.y - 20, "#00ff00"); }
             function defense_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 10) return; player.energy -= 10; abilityCooldowns[2] = 180; player.stats.reflectDamage = 0.5; burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#8888ff", 25, 6); setTimeout(()=>player.stats.reflectDamage = 0.3,3000); }
-            function energy_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 25) return; player.energy -= 25; abilityCooldowns[0] = 90; let dmg = player.stats.energy * 0.8; dealDamageToNPC(dmg, true, 10); vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: npc.x, targetY: npc.y, color: "#ff6600", life: 20 }); burstParticles(npc.x, npc.y + npc.h / 2, "#ff6600", 40, 10); }
-            function energy_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 40) return; player.energy -= 40; abilityCooldowns[1] = 150; let dmg = player.stats.energy * 1.5; dealDamageToNPC(dmg, true, 25); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); triggerScreenShake(20,12); }
+            function energy_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 25) return; player.energy -= 25; abilityCooldowns[0] = 90; let dmg = player.stats.energy * 0.8; dealDamageToGuardian(dmg, true, 10); vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: riftGuardian.x, targetY: riftGuardian.y, color: "#ff6600", life: 20 }); burstParticles(riftGuardian.x, riftGuardian.y + riftGuardian.h / 2, "#ff6600", 40, 10); }
+            function energy_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 40) return; player.energy -= 40; abilityCooldowns[1] = 150; let dmg = player.stats.energy * 1.5; dealDamageToGuardian(dmg, true, 25); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); triggerScreenShake(20,12); }
             function energy_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[2] = 60; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); player.x += player.facing * 150; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); }
 
-            // ===================== INPUT HANDLER =====================
+            // ===================== INPUT HANDLER (Restricted by game state) =====================
             function ability1() {
-                if (menuOpen) return;
+                if (menuOpen || gameState !== 'combat') return;
                 if (savedBuild === 'Strength') strength_ability1();
                 else if (savedBuild === 'Defense') defense_ability1();
                 else if (savedBuild === 'Energy') energy_ability1();
             }
 
             function ability2() {
-                if (menuOpen) return;
+                if (menuOpen || gameState !== 'combat') return;
                 if (savedBuild === 'Speed') speed_ability2();
                 else if (savedBuild === 'Strength') strength_ability2();
                 else if (savedBuild === 'Defense') defense_ability2();
@@ -946,7 +1104,7 @@
             }
 
             function ability3() {
-                if (menuOpen) return;
+                if (menuOpen || gameState !== 'combat') return;
                 if (savedBuild === 'Speed') speed_ability3();
                 else if (savedBuild === 'Strength') strength_ability3();
                 else if (savedBuild === 'Defense') defense_ability3();
@@ -954,6 +1112,8 @@
             }
 
             document.addEventListener("keydown", (e) => {
+                if (gameState !== 'combat') return;
+
                 if (e.key === "1") ability1();
                 if (e.key === "2") ability2();
                 if (e.key === "3") ability3();
@@ -974,7 +1134,7 @@
 
             canvas.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                if (zeroPoint.cooldown > 0 || menuOpen) return;
+                if (zeroPoint.cooldown > 0 || menuOpen || gameState !== 'combat') return;
                 startZeroPointCharge();
             });
 
@@ -1003,11 +1163,186 @@
                 const recentDamage = combatMetrics.damageLog.reduce((sum, entry) => sum + entry.damage, 0);
                 combatMetrics.dps = recentDamage / 3.0;
             }
+            
+            // ===== NEW: Dialogue & Quest System Logic =====
+            const monologueLines = [
+                { speaker: "???", text: "Where... Where am I? The last thing I remember was the surge, the collapse..." },
+                { speaker: "???", text: "This place... it feels like the edge of everything. A fractured reality. And why do I feel this... power? I should be dead." },
+                { speaker: "Whisper", text: "Remeber... the Code..." },
+                { speaker: "???", text: "What was that? A whisper? No time for that. There's... something moving on the horizon." },
+                { speaker: "Rift Guardian", text: "INTRUDER. YOU WILL NOT PASS THE FRACTURE POINT. EXECUTING DECONSTRUCTION PROTOCOL." },
+                { speaker: "???", text: "A Guardian. Figures. If I can't think my way out of this, I'll have to punch my way through." },
+            ];
+            let currentMonologueIndex = 0;
+            let typingTimer = null;
 
-            // ===== UPDATE LOOP =====
+            function startDialogue() {
+                gameState = 'dialogue';
+                document.getElementById('dialogueBox').style.display = 'block';
+                typeMonologue(monologueLines[currentMonologueIndex]);
+            }
+
+            function typeMonologue(line) {
+                document.getElementById('dialogueSpeaker').innerText = line.speaker;
+                const textElement = document.getElementById('dialogueText');
+                textElement.innerText = '';
+                let i = 0;
+                if (typingTimer) clearTimeout(typingTimer);
+
+                const typeChar = () => {
+                    if (i < line.text.length) {
+                        textElement.innerText += line.text.charAt(i);
+                        i++;
+                        typingTimer = setTimeout(typeChar, line.speaker === "???" ? 40 : 60);
+                    } else {
+                        document.getElementById('dialogueContinue').style.display = 'block';
+                    }
+                };
+                document.getElementById('dialogueContinue').style.display = 'none';
+                typeChar();
+            }
+
+            function advanceDialogue() {
+                if (typingTimer) { // If still typing, show full text
+                    clearTimeout(typingTimer);
+                    document.getElementById('dialogueText').innerText = monologueLines[currentMonologueIndex].text;
+                    document.getElementById('dialogueContinue').style.display = 'block';
+                    typingTimer = null;
+                    return;
+                }
+
+                currentMonologueIndex++;
+                if (currentMonologueIndex < monologueLines.length) {
+                    typeMonologue(monologueLines[currentMonologueIndex]);
+                } else {
+                    document.getElementById('dialogueBox').style.display = 'none';
+                    startCombat();
+                }
+            }
+
+            function startCombat() {
+                gameState = 'combat';
+                document.getElementById('questTracker').style.display = 'block';
+                riftGuardian.x = canvas.width - riftGuardian.w - 150; // Place Guardian to the right
+                player.x = 150; // Place player to the left
+                document.getElementById('npcHpBar').style.display = 'block';
+                updateQuest('Defeat the Rift Guardian', 'Destroy the entity blocking your path.');
+                startTutorial();
+                startWhispers();
+            }
+            
+            function transitionToScene2() {
+                gameState = 'scene2';
+                document.getElementById('npcHpBar').style.display = 'none';
+                document.getElementById('questTracker').style.display = 'none';
+                document.getElementById('combatInfo').style.display = 'none';
+                document.getElementById('abilityBar').style.display = 'none';
+                
+                triggerFullFlash("#0ff", 30);
+                triggerScreenShake(60, 25);
+                
+                document.getElementById('dialogueBox').style.display = 'block';
+                document.getElementById('dialogueSpeaker').innerText = "???";
+                document.getElementById('dialogueText').innerText = "The Guardian is shattered. The path is open. I remember... something.";
+                document.getElementById('dialogueContinue').style.display = 'none';
+
+                // Placeholder for scene transition
+                setTimeout(() => {
+                    document.getElementById('dialogueText').innerText = "FRACTURE: SCENE TWO - TO BE CONTINUED";
+                }, 5000);
+            }
+            
+            function updateQuest(title, text) {
+                document.getElementById('questTitle').innerText = title;
+                document.getElementById('questText').innerText = text;
+            }
+
+            // ===== NEW: Tutorial System =====
+            const tutorialSteps = [
+                { text: `Your first objective is simple: **Punch** the Guardian! Use <span class="tutorialKey">LMB</span> to attack.`, check: () => combatMetrics.totalDamage > 0, complete: 'Good! You connected. Now, master evasion.' },
+                { text: `The Guardian will try to hit you. Use your **Dash** to evade! Press <span class="tutorialKey">Q</span> to dash.`, check: () => player.isDashing, complete: 'Great dash! You can also chain abilities with your dash.' },
+                { text: `Time for raw power. Charge the **Zero-Point Impact** by holding <span class="tutorialKey">RMB</span>. Unleash the charge by hitting the Guardian with <span class="tutorialKey">LMB</span>.`, check: () => zeroPoint.charged, complete: 'Incredible power! Zero-Point is key for massive damage.' },
+                { text: `When the Guardian attacks, you can try to **Block**. Hold <span class="tutorialKey">F</span> to dramatically reduce incoming damage.`, check: () => player.isBlocking, complete: 'A solid block! Remember to manage your Stamina (Green Bar).' },
+                { text: `Keep attacking the Guardian. Defeat it to proceed! Good luck.`, check: () => !riftGuardian.alive, complete: 'Victory!' },
+            ];
+            let currentTutorialStep = 0;
+
+            function startTutorial() {
+                currentTutorialStep = 0;
+                document.getElementById('tutorialBar').style.opacity = 1;
+                updateTutorial();
+            }
+            
+            function updateTutorial() {
+                if (currentTutorialStep >= tutorialSteps.length) {
+                    document.getElementById('tutorialBar').style.opacity = 0;
+                    return;
+                }
+                document.getElementById('tutorialBar').innerHTML = tutorialSteps[currentTutorialStep].text;
+            }
+            
+            function nextTutorialStep() {
+                if (currentTutorialStep >= tutorialSteps.length) return;
+                
+                // Flash green on completion
+                document.getElementById('tutorialBar').style.backgroundColor = 'rgba(0, 150, 0, 0.85)';
+                document.getElementById('tutorialBar').innerHTML = tutorialSteps[currentTutorialStep].complete;
+                
+                setTimeout(() => {
+                    currentTutorialStep++;
+                    document.getElementById('tutorialBar').style.backgroundColor = 'rgba(20, 20, 50, 0.85)';
+                    updateTutorial();
+                }, 1500);
+            }
+
+            // ===== NEW: Whisper System =====
+            const whispers = [
+                "Remember your name.",
+                "The Code is calling.",
+                "Fracture... it is you.",
+                "Wake up!",
+                "Find the source.",
+                "Your true form awaits."
+            ];
+            let lastWhisperTime = Date.now();
+            const WHISPER_INTERVAL = 10000; // 10 seconds
+
+            function startWhispers() {
+                lastWhisperTime = Date.now();
+                whisperLoop();
+            }
+
+            function whisperLoop() {
+                if (gameState !== 'combat' || !riftGuardian.alive) return;
+
+                if (Date.now() - lastWhisperTime > WHISPER_INTERVAL) {
+                    const whisperElement = document.getElementById('whispers');
+                    const randomWhisper = whispers[Math.floor(Math.random() * whispers.length)];
+                    
+                    whisperElement.innerText = randomWhisper;
+                    whisperElement.style.opacity = 1;
+
+                    setTimeout(() => {
+                        whisperElement.style.opacity = 0;
+                    }, 3000); // Display for 3 seconds
+
+                    lastWhisperTime = Date.now();
+                }
+                
+                // Check if tutorial step is complete
+                if (currentTutorialStep < tutorialSteps.length && tutorialSteps[currentTutorialStep].check()) {
+                    nextTutorialStep();
+                }
+
+                requestAnimationFrame(whisperLoop);
+            }
+
+
+            // ===== UPDATE LOOP (Restricted by game state) =====
             function update() {
-                if (menuOpen) return;
+                if (menuOpen || gameState === 'dialogue' || gameState === 'scene2') return;
 
+                // --- ZERO-POINT UPDATE ---
                 if (zeroPoint.cooldown > 0) zeroPoint.cooldown--;
 
                 if (zeroPoint.active) {
@@ -1032,28 +1367,28 @@
                     }
                 }
 
-                // --- UPDATE NPC PHYSICS (KNOCKBACK) ---
-                if (npc.alive) {
-                    npc.x += npc.velX;
-                    npc.velX *= 0.9;
-                    if (Math.abs(npc.velX) < 0.5) npc.velX = 0;
+                // --- UPDATE RIFT GUARDIAN PHYSICS (KNOCKBACK) ---
+                if (riftGuardian.alive) {
+                    riftGuardian.x += riftGuardian.velX;
+                    riftGuardian.velX *= 0.9;
+                    if (Math.abs(riftGuardian.velX) < 0.5) riftGuardian.velX = 0;
                     
-                    if (npc.hitFlashTimer > 0) npc.hitFlashTimer--;
+                    if (riftGuardian.hitFlashTimer > 0) riftGuardian.hitFlashTimer--;
 
-                    if (npc.x < -200) npc.x = -200;
-                    if (npc.x > canvas.width + 200) npc.x = canvas.width + 200;
+                    if (riftGuardian.x < 50) riftGuardian.x = 50;
+                    if (riftGuardian.x > canvas.width - riftGuardian.w - 50) riftGuardian.x = canvas.width - riftGuardian.w - 50;
                 }
 
-                if (npc.isAirborne) {
+                if (riftGuardian.isAirborne) {
                     const currentGroundY = canvas.height - 80;
-                    npc.airborneVelY += 1.2; 
-                    npc.y += npc.airborneVelY;
-                    npc.airborneLife--;
+                    riftGuardian.airborneVelY += 1.2; 
+                    riftGuardian.y += riftGuardian.airborneVelY;
+                    riftGuardian.airborneLife--;
                     
-                    if (npc.airborneLife <= 0 || npc.y + npc.h >= currentGroundY) {
-                         npc.isAirborne = false;
-                         npc.y = currentGroundY - npc.h;
-                         vfxQueue.push({ type: 'impactFlash', x: npc.x + npc.w / 2, y: currentGroundY, color: "#ffaa00", life: 10 });
+                    if (riftGuardian.airborneLife <= 0 || riftGuardian.y + riftGuardian.h >= currentGroundY) {
+                         riftGuardian.isAirborne = false;
+                         riftGuardian.y = currentGroundY - riftGuardian.h;
+                         vfxQueue.push({ type: 'impactFlash', x: riftGuardian.x + riftGuardian.w / 2, y: currentGroundY, color: "#ffaa00", life: 10 });
                     }
                 }
 
@@ -1138,13 +1473,13 @@
                 }
                 
                 // --- DASHING & COMBAT ---
-                if (player.isDashing && npc.alive && !player.hasDashHit) {
+                if (player.isDashing && riftGuardian.alive && !player.hasDashHit) {
                     let dashHitbox = { x: player.x, y: player.y, w: player.w, h: player.h };
-                    let npcBox = getNPCBox();
+                    let guardianBox = getNPCBox();
 
-                    if (rectCollide(dashHitbox, npcBox)) {
+                    if (rectCollide(dashHitbox, guardianBox)) {
                         const dashPunchDamage = player.stats.strength * 2.5;
-                        dealDamageToNPC(dashPunchDamage, true, 12);
+                        dealDamageToGuardian(dashPunchDamage, true, 12);
 
                         player.velX = 0;
                         player.isDashing = false; 
@@ -1169,7 +1504,7 @@
                 if (player.attackTime > 0) player.attackTime--;
                 if (player.attackCooldown > 0) player.attackCooldown--;
 
-                // --- VFX UPDATES ---
+                // --- VFX & UI UPDATES ---
                 for (let i = particles.length - 1; i >= 0; i--) {
                     let p = particles[i];
                     p.x += p.velX;
@@ -1207,7 +1542,7 @@
                 updateCombatUI(); 
             }
 
-            // ===== UI UPDATES (unchanged) =====
+            // ===== UI UPDATES (Updated to use riftGuardian) =====
             function updateMainHUD() {
                 const hpRatio = player.hp / player.maxHp;
                 document.getElementById("hpBarInner").style.width = (hpRatio * 100) + "%";
@@ -1222,8 +1557,11 @@
                 document.getElementById("xpLabel").innerText = `XP: ${parseInt(player.xp)} / ${player.xpToNextLevel}`;
                 document.getElementById("levelDisplay").innerText = `Lvl: ${player.level}`;
                 
-                if (npc.alive) {
-                    document.getElementById("npcHpBarInner").style.width = (npc.hp / npc.maxHp * 100) + "%";
+                if (riftGuardian.alive && gameState === 'combat') {
+                    document.getElementById("npcHpBarInner").style.width = (riftGuardian.hp / riftGuardian.maxHp * 100) + "%";
+                    document.getElementById("npcHpBar").style.display = "block";
+                } else {
+                    document.getElementById("npcHpBar").style.display = "none";
                 }
 
                 let redTintOpacity = 0;
@@ -1276,50 +1614,7 @@
                 }
             }
 
-            // ===== DRAW LOOP (modified zero-point diamond drawing smaller & true diamond shape) =====
-
-            // NEW: Function to draw floating fists
-            function drawFists() {
-                const fistSize = 10;
-                const fistColorPassive = "#0088ff"; // Blue
-                const fistColorPunch = "#66ccff"; // Light Blue for punch
-                
-                // We want the center of the fist to be 2px outside the player's edge.
-                // The relative offset from the player's center to the fist's center (when stationary):
-                // Half player width (20) + Half fist size (5) + Gap (2) = 27
-                const STATIONARY_OFFSET_MAGNITUDE = player.w / 2 + fistSize / 2 + 2;
-
-                const offsetX = STATIONARY_OFFSET_MAGNITUDE * player.facing;
-                const baseY = player.y + player.h / 2; // True vertical center
-                
-                // Punch offset and color based on attack time
-                const punchOffset = player.attackTime > 0 ? player.attackTime * 1.8 * player.facing : 0;
-                const color = player.attackTime > 0 ? fistColorPunch : fistColorPassive;
-                const alpha = player.attackTime > 0 ? 1.0 : 0.7;
-
-                // Fist 1 (closer to player/hand position)
-                const fist1X = player.x + player.w / 2 + offsetX + punchOffset;
-                const fist1Y = baseY - fistSize; // Raised slightly above center
-
-                // Fist 2 (slightly offset/trailing)
-                const fist2X = player.x + player.w / 2 + offsetX + punchOffset * 0.5;
-                const fist2Y = baseY + fistSize; // Lowered slightly below center
-
-                ctx.save();
-                ctx.globalAlpha = alpha;
-                ctx.fillStyle = color;
-
-                // Draw Fist 1 (square for simplicity) - centered on (fist1X, fist1Y)
-                ctx.fillRect(fist1X - fistSize / 2, fist1Y - fistSize / 2, fistSize, fistSize);
-
-                // Draw Fist 2 (slightly smaller/more transparent) - centered on (fist2X, fist2Y)
-                ctx.globalAlpha = alpha * 0.5; 
-                const fist2Size = fistSize / 1.5;
-                ctx.fillRect(fist2X - fist2Size / 2, fist2Y - fist2Size / 2, fist2Size, fist2Size);
-                
-                ctx.restore();
-            }
-
+            // ===== DRAW LOOP (Updated to draw Rift Guardian) =====
             function draw() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
@@ -1358,7 +1653,7 @@
                 
                 ctx.restore();
 
-                // Foreground draw (unchanged)
+                // Foreground draw 
                 ctx.save(); 
                 ctx.translate(shakeOffsetX, shakeOffsetY);
                 ctx.translate(-camX, 0);
@@ -1373,30 +1668,34 @@
                 }
                 ctx.globalAlpha = 1;
 
-                if (npc.alive) {
-                    const npcDrawY = npc.isAirborne ? npc.y : GROUND_Y_GLOBAL - npc.h;
-                    if (npc.hitFlashTimer > 0) {
+                // Draw Rift Guardian
+                if (riftGuardian.alive) {
+                    const guardianDrawY = riftGuardian.isAirborne ? riftGuardian.y : GROUND_Y_GLOBAL - riftGuardian.h;
+                    if (riftGuardian.hitFlashTimer > 0) {
                         ctx.fillStyle = "#ffffff";
                         ctx.shadowBlur = 20;
                         ctx.shadowColor = "white";
                     } else {
-                        ctx.fillStyle = "#f33";
-                        ctx.shadowBlur = 0;
+                        // Guardian is a dark, shadowy figure with a red core
+                        ctx.fillStyle = "#110000";
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = "#ff3333";
                     }
-                    ctx.fillRect(npc.x, npcDrawY, npc.w, npc.h);
+                    ctx.fillRect(riftGuardian.x, guardianDrawY, riftGuardian.w, riftGuardian.h);
                     ctx.shadowBlur = 0;
-                    if(npc.isAirborne) {
-                        ctx.strokeStyle = "#ffffff";
+                    if(riftGuardian.isAirborne) {
+                        ctx.strokeStyle = "#ff0000";
                         ctx.lineWidth = 1;
                         ctx.globalAlpha = 0.5;
                         ctx.beginPath();
-                        ctx.moveTo(npc.x + npc.w/2, npcDrawY);
-                        ctx.lineTo(npc.x + npc.w/2, GROUND_Y_GLOBAL - npc.h);
+                        ctx.moveTo(riftGuardian.x + riftGuardian.w/2, guardianDrawY);
+                        ctx.lineTo(riftGuardian.x + riftGuardian.w/2, GROUND_Y_GLOBAL - riftGuardian.h);
                         ctx.stroke();
                         ctx.globalAlpha = 1;
                     }
                 }
 
+                // Draw Player (unchanged)
                 ctx.fillStyle = "#4af";
                 if (player.invincible) {
                     ctx.fillStyle = "#00ffff";
@@ -1424,9 +1723,6 @@
                     ctx.stroke();
                     ctx.globalAlpha = 1;
                 }
-                
-                // Draw the floating fists
-                drawFists();
 
                 if (player.attackTime > 0) {
                     let hitbox = getAttackBox();
@@ -1454,7 +1750,7 @@
                         const maxLife = 20;
                         const progress = 1 - vfx.life / maxLife;
                         const currentX = vfx.x + (vfx.targetX - vfx.x) * progress;
-                        const currentY = vfx.y + (GROUND_Y_GLOBAL - npc.h / 2 - vfx.y) * progress;
+                        const currentY = vfx.y + (GROUND_Y_GLOBAL - riftGuardian.h / 2 - vfx.y) * progress;
                         ctx.beginPath();
                         ctx.arc(currentX, currentY, 10, 0, Math.PI * 2);
                         ctx.fill();
@@ -1519,15 +1815,13 @@
                     }
                 }
 
-                // --- DRAW ZERO-POINT DIAMOND UI (much smaller diamond shape) ---
+                // --- DRAW ZERO-POINT DIAMOND UI ---
                 if (zeroPoint.active || zeroPoint.charged) {
                     const cx = canvas.width / 2;
                     const cy = canvas.height / 2 - 80;
-                    // much smaller size for diamond
-                    const size = 36; // half width of diamond (distance from center to each point)
+                    const size = 36;
                     const progress = Math.min(1, zeroPoint.timer / zeroPoint.duration);
 
-                    // small aura
                     ctx.save();
                     const auraAlpha = zeroPoint.charged ? 0.9 : 0.25 + Math.sin(Date.now() * 0.03) * 0.12;
                     ctx.globalAlpha = auraAlpha;
@@ -1537,39 +1831,30 @@
                     ctx.fill();
                     ctx.globalAlpha = 1;
 
-                    // draw diamond shape (rotated square visual) — create diamond by four points
                     const diamondColor = zeroPoint.charged ? '#ff6666' : '#a60000';
                     ctx.fillStyle = diamondColor;
                     ctx.strokeStyle = '#000';
                     ctx.lineWidth = 2;
                     ctx.beginPath();
-                    // top
                     ctx.moveTo(cx, cy - size);
-                    // right
                     ctx.lineTo(cx + size, cy);
-                    // bottom
                     ctx.lineTo(cx, cy + size);
-                    // left
                     ctx.lineTo(cx - size, cy);
                     ctx.closePath();
-                    // inner fill scaled by progress (smaller inner diamond)
                     ctx.fill();
                     ctx.stroke();
 
-                    // inner progress diamond (charge)
-                    const innerSize = size * (0.12 + 0.88 * progress); // small when starting, grows with charge
+                    const innerSize = size * (0.12 + 0.88 * progress);
                     ctx.fillStyle = zeroPoint.charged ? '#fff0f0' : '#330000';
                     ctx.beginPath();
                     ctx.moveTo(cx, cy - innerSize);
                     ctx.lineTo(cx + innerSize, cy);
                     ctx.lineTo(cx, cy + innerSize);
                     ctx.lineTo(cx - innerSize, cy);
-                    ctx.lineTo(cx - innerSize, cy);
                     ctx.closePath();
                     ctx.fill();
                     ctx.stroke();
 
-                    // tiny center core
                     ctx.fillStyle = '#000';
                     ctx.globalAlpha = 0.6;
                     ctx.beginPath();
@@ -1577,7 +1862,6 @@
                     ctx.fill();
                     ctx.globalAlpha = 1;
 
-                    // small text below diamond (smaller font)
                     ctx.fillStyle = '#fff';
                     ctx.font = zeroPoint.charged ? 'bold 12px Arial' : '12px Arial';
                     ctx.textAlign = 'center';
@@ -1599,6 +1883,9 @@
                 draw();
                 requestAnimationFrame(loop);
             }
+
+            // ===== GAME START =====
+            startDialogue();
             loop();
         </script>
     </body>
