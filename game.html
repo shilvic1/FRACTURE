@@ -319,7 +319,6 @@
             <div id="npcHpBarInner"></div>
         </div>
 
-        <!-- Ability bar moved to very bottom-right and made much smaller -->
         <div id="abilityBar">
             <div id="abilityTitle">Universal: <span id="uniAbilityName">Punch</span> (LMB)</div>
 
@@ -846,7 +845,7 @@
                         damage *= mul;
                         knockback *= mul * 6;
                         vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: mul });
-                        burstParticles(player.x + player.w/2, player.y + player.h/2, "#ffffff", Math.max(20, 40 * mul), 18 * mul);
+                        burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ffffff", Math.max(20, 40 * mul), 18 * mul);
                         triggerScreenShake(30, 20 * mul);
                         triggerFullFlash("#ffffff", 4);
                         zeroPoint.charged = false;
@@ -1278,6 +1277,49 @@
             }
 
             // ===== DRAW LOOP (modified zero-point diamond drawing smaller & true diamond shape) =====
+
+            // NEW: Function to draw floating fists
+            function drawFists() {
+                const fistSize = 10;
+                const fistColorPassive = "#0088ff"; // Blue
+                const fistColorPunch = "#66ccff"; // Light Blue for punch
+                
+                // We want the center of the fist to be 2px outside the player's edge.
+                // The relative offset from the player's center to the fist's center (when stationary):
+                // Half player width (20) + Half fist size (5) + Gap (2) = 27
+                const STATIONARY_OFFSET_MAGNITUDE = player.w / 2 + fistSize / 2 + 2;
+
+                const offsetX = STATIONARY_OFFSET_MAGNITUDE * player.facing;
+                const baseY = player.y + player.h / 2; // True vertical center
+                
+                // Punch offset and color based on attack time
+                const punchOffset = player.attackTime > 0 ? player.attackTime * 1.8 * player.facing : 0;
+                const color = player.attackTime > 0 ? fistColorPunch : fistColorPassive;
+                const alpha = player.attackTime > 0 ? 1.0 : 0.7;
+
+                // Fist 1 (closer to player/hand position)
+                const fist1X = player.x + player.w / 2 + offsetX + punchOffset;
+                const fist1Y = baseY - fistSize; // Raised slightly above center
+
+                // Fist 2 (slightly offset/trailing)
+                const fist2X = player.x + player.w / 2 + offsetX + punchOffset * 0.5;
+                const fist2Y = baseY + fistSize; // Lowered slightly below center
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = color;
+
+                // Draw Fist 1 (square for simplicity) - centered on (fist1X, fist1Y)
+                ctx.fillRect(fist1X - fistSize / 2, fist1Y - fistSize / 2, fistSize, fistSize);
+
+                // Draw Fist 2 (slightly smaller/more transparent) - centered on (fist2X, fist2Y)
+                ctx.globalAlpha = alpha * 0.5; 
+                const fist2Size = fistSize / 1.5;
+                ctx.fillRect(fist2X - fist2Size / 2, fist2Y - fist2Size / 2, fist2Size, fist2Size);
+                
+                ctx.restore();
+            }
+
             function draw() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
@@ -1382,6 +1424,9 @@
                     ctx.stroke();
                     ctx.globalAlpha = 1;
                 }
+                
+                // Draw the floating fists
+                drawFists();
 
                 if (player.attackTime > 0) {
                     let hitbox = getAttackBox();
@@ -1518,6 +1563,7 @@
                     ctx.moveTo(cx, cy - innerSize);
                     ctx.lineTo(cx + innerSize, cy);
                     ctx.lineTo(cx, cy + innerSize);
+                    ctx.lineTo(cx - innerSize, cy);
                     ctx.lineTo(cx - innerSize, cy);
                     ctx.closePath();
                     ctx.fill();
