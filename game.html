@@ -14,7 +14,7 @@
                 display: block;
             }
 
-            /* --- NEW: Dialogue Box --- */
+            /* --- Dialogue Box --- */
             #dialogueBox {
                 position: fixed;
                 bottom: 0;
@@ -27,7 +27,7 @@
                 box-sizing: border-box;
                 z-index: 100;
                 border-top: 2px solid #0ff;
-                display: none; /* Controlled by JS */
+                display: none; 
             }
 
             #dialogueText {
@@ -52,7 +52,7 @@
             }
             @keyframes blink { 50% { opacity: 0; } }
 
-            /* --- NEW: Quest Tracker --- */
+            /* --- Quest Tracker --- */
             #questTracker {
                 position: fixed;
                 top: 10px;
@@ -64,7 +64,7 @@
                 font-size: 14px;
                 z-index: 10;
                 box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
-                display: none; /* Only show in combat state */
+                display: none; 
             }
             #questTitle {
                 font-weight: bold;
@@ -73,10 +73,10 @@
                 font-size: 16px;
             }
 
-            /* --- NEW: Tutorial Bar (Bottom Center) --- */
+            /* --- Tutorial Bar --- */
             #tutorialBar {
                 position: fixed;
-                bottom: 140px; /* Above dialogue box area */
+                bottom: 140px;
                 left: 50%;
                 transform: translateX(-50%);
                 width: 70%;
@@ -89,7 +89,7 @@
                 font-size: 12px;
                 z-index: 90;
                 box-shadow: 0 0 15px rgba(68, 170, 255, 0.3);
-                opacity: 0; /* Control visibility with opacity and transition */
+                opacity: 0;
                 transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
             }
             .tutorialKey {
@@ -103,7 +103,7 @@
                 margin: 0 3px;
             }
             
-            /* --- NEW: Whisper Effect --- */
+            /* --- Whisper Effect --- */
             #whispers {
                 position: fixed;
                 top: 50%;
@@ -121,6 +121,47 @@
                 pointer-events: none;
             }
 
+            /* --- NEW: Interact Prompt --- */
+            #interactHint {
+                position: fixed;
+                left: 50%;
+                top: 40%;
+                transform: translate(-50%, -50%);
+                background: rgba(0, 0, 0, 0.8);
+                border: 2px solid #fff;
+                color: #fff;
+                padding: 10px 20px;
+                font-family: Arial, sans-serif;
+                font-weight: bold;
+                z-index: 80;
+                display: none;
+                box-shadow: 0 0 15px #fff;
+            }
+            .keyPrompt {
+                background: #fff;
+                color: #000;
+                padding: 2px 6px;
+                border-radius: 3px;
+                margin-right: 5px;
+            }
+
+            /* --- NEW: Item Notification --- */
+            #itemNotification {
+                position: fixed;
+                top: 20%;
+                left: 50%;
+                transform: translate(-50%, -50%) scale(0);
+                background: rgba(0, 0, 0, 0.9);
+                border: 2px solid #b0f;
+                color: #d0f;
+                padding: 20px 40px;
+                text-align: center;
+                z-index: 95;
+                transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                box-shadow: 0 0 30px #b0f;
+            }
+            #itemTitle { font-size: 24px; font-weight: bold; color: #fff; margin-bottom: 5px; }
+            #itemDesc { font-size: 14px; color: #b0f; }
 
             /* Existing styles */
             #mainHud {
@@ -174,7 +215,6 @@
                 text-shadow: 0 0 5px #0ff;
             }
 
-            /* DPS Meter & Combo Counter Container */
             #combatInfo {
                 position: fixed;
                 top: 10px;
@@ -191,7 +231,7 @@
             #dpsMeter {
                 font-size: 18px;
                 font-weight: bold;
-                color: #f00; /* Red for damage */
+                color: #f00; 
                 text-shadow: 0 0 8px #f008;
                 margin-bottom: 5px;
             }
@@ -199,13 +239,12 @@
             #comboCounter {
                 font-size: 24px;
                 font-weight: bold;
-                color: #ffaa00; /* Gold/Orange for combo */
+                color: #ffaa00; 
                 text-shadow: 0 0 10px #ffaa00;
                 transition: transform 0.1s ease-out;
             }
             
-            /* NPC HP Bar */
-            #npcHpBar { /* Renaming this to guardianHpBar in JS */
+            #npcHpBar { 
                 position: fixed;
                 top: 10px;
                 right: 10px;
@@ -231,12 +270,11 @@
                 background: #f33;
             }
 
-            /* Ability Bar - compact and anchored to the very bottom-right corner (smaller) */
             #abilityBar {
                 position: fixed;
-                bottom: 6px;        /* very bottom */
-                right: 6px;         /* very right */
-                width: 120px;       /* much smaller container */
+                bottom: 6px;        
+                right: 6px;         
+                width: 120px;       
                 display: flex;
                 flex-direction: column;
                 gap: 6px;
@@ -247,13 +285,12 @@
                 border-radius: 6px;
                 border-left: 1px solid rgba(255,255,255,0.03);
                 box-shadow: 0 8px 24px rgba(0,0,0,0.75);
-                transform: rotate(-3deg); /* small negative angle */
+                transform: rotate(-3deg); 
                 transform-origin: bottom right;
                 backdrop-filter: blur(3px);
                 pointer-events: auto;
             }
 
-            /* Title sits at the top of the angled column; counter-rotate to read horizontally */
             #abilityTitle {
                 font-size: 9px;
                 letter-spacing: 0.6px;
@@ -263,13 +300,12 @@
                 color: #9bdcff;
                 text-shadow: 0 0 6px rgba(102,200,255,0.12);
                 align-self: flex-end;
-                transform: rotate(3deg); /* counter-rotate so text reads straight */
+                transform: rotate(3deg); 
             }
 
-            /* Each slot is visually horizontal but counter-rotated to sit inside the angled column */
             .abilitySlot {
-                width: 100px;       /* compact slot width */
-                height: 26px;       /* thinner slot */
+                width: 100px;       
+                height: 26px;       
                 background: linear-gradient(180deg, rgba(25,26,30,0.82), rgba(12,12,16,0.66));
                 border: 1px solid rgba(255,255,255,0.04);
                 border-radius: 4px;
@@ -280,7 +316,7 @@
                 justify-content: space-between;
                 gap: 6px;
                 position: relative;
-                transform: rotate(3deg); /* counter-rotate so content reads horizontally */
+                transform: rotate(3deg); 
                 cursor: default;
                 font-family: Arial, sans-serif;
             }
@@ -329,7 +365,6 @@
                 transition: clip-path 0.1s linear;
             }
 
-            /* Stats Menu Overlay */
             #statsMenu {
                 position: fixed;
                 top: 50%;
@@ -341,7 +376,7 @@
                 color: white;
                 padding: 20px;
                 font-family: Arial;
-                display: none; /* Hidden by default */
+                display: none; 
                 z-index: 50;
                 box-shadow: 0 0 20px #0ff8;
             }
@@ -369,20 +404,18 @@
                 font-weight: bold;
             }
 
-            /* Low HP Overlay */
             #lowHpOverlay {
                 position: fixed;
                 top: 0;
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background-color: rgba(255, 0, 0, 0.0); /* Start transparent */
+                background-color: rgba(255, 0, 0, 0.0);
                 pointer-events: none;
-                z-index: 5; /* Below HUD, above canvas */
-                transition: background-color 0.1s ease-out; /* Smoother flash transition */
+                z-index: 5;
+                transition: background-color 0.1s ease-out;
             }
 
-            /* Zero-Point diamond HUD helper text (DOM) */
             #zeroPointHint {
                 position: fixed;
                 left: 50%;
@@ -398,7 +431,6 @@
                 text-shadow: 0 0 6px #000;
             }
 
-            /* Keep the bar usable on very small screens */
             @media (max-width: 420px) {
                 #abilityBar { right: 6px; bottom: 6px; width: 110px; transform: rotate(-3deg); padding: 6px; }
                 .abilitySlot { width: 90px; height: 24px; transform: rotate(3deg); padding: 3px 5px; }
@@ -412,6 +444,12 @@
         <div id="lowHpOverlay"></div>
         <div id="zeroPointHint">Press R to unleash Zero-Point Impact</div>
         
+        <div id="interactHint"><span class="keyPrompt">E</span> Enter Portal</div>
+        <div id="itemNotification">
+            <div id="itemTitle">Memory Shard Acquired</div>
+            <div id="itemDesc">A fragment of a forgotten past.</div>
+        </div>
+
         <div id="mainHud">
             <div id="levelDisplay">Lvl: 1</div>
             <div class="statBarContainer">
@@ -509,17 +547,19 @@
 
         <script>
             // ===== GAME STATE & CORE SETUP =====
-            let gameState = 'dialogue'; // 'dialogue', 'combat', 'scene2'
+            let gameState = 'dialogue'; // 'dialogue', 'combat', 'post-combat', 'scene2'
             const canvas = document.getElementById("gameCanvas");
             const ctx = canvas.getContext("2d");
             canvas.width = innerWidth;
             canvas.height = innerHeight;
+            const GROUND_Y = canvas.height - 80;
+
             window.addEventListener('resize', () => {
                 canvas.width = innerWidth;
                 canvas.height = innerHeight;
             });
             
-            // ===== PLAYER STATS (unchanged) =====
+            // ===== PLAYER STATS =====
             const player = {
                 x: 0,
                 y: 0,
@@ -558,10 +598,31 @@
                 wasOnGround: false,
                 isSprinting: false,
                 justStartedSprinting: false,
-                alive: true
+                alive: true,
+                inventory: {
+                    shards: 0
+                }
             };
 
-            // ===== COMBAT METRICS (unchanged) =====
+            // ===== WORLD OBJECTS =====
+            const door = {
+                x: 0,
+                y: GROUND_Y - 120,
+                w: 80,
+                h: 120,
+                active: false,
+                alpha: 0
+            };
+
+            const mira = {
+                x: 0,
+                y: GROUND_Y - 60,
+                w: 35,
+                h: 60,
+                active: false
+            };
+
+            // ===== COMBAT METRICS =====
             const combatMetrics = {
                 totalDamage: 0,
                 damageLog: [],
@@ -576,7 +637,7 @@
                 return 100 + (level - 1) * 50; 
             }
 
-            // ===== CHARACTER CREATOR/BUILD SELECTION (unchanged) =====
+            // ===== CHARACTER CREATOR/BUILD SELECTION =====
             const savedBuild = localStorage.getItem('fracture_charbuild') || 'Strength';
             
             const buildStats = {
@@ -603,13 +664,13 @@
             document.getElementById("name4").innerText = "Dash/Punch";
             document.getElementById("abilityTitle").innerHTML = `${savedBuild} Build Active / **DASH (Q)** / **BLOCK (F)**`;
 
-            // ===== RIFT GUARDIAN (Refactored NPC) ===== 
+            // ===== RIFT GUARDIAN ===== 
             const riftGuardian = {
-                x: 400, // Initial position, updated by game loop to be on the right
+                x: 400, 
                 y: 0,
-                w: 60, // Slightly bigger
-                h: 80, // Slightly bigger
-                hp: 500, // More health for a boss fight
+                w: 60, 
+                h: 80, 
+                hp: 500, 
                 maxHp: 500,
                 alive: true,
                 xpValue: 100,
@@ -618,27 +679,32 @@
                 airborneLife: 0,
                 velX: 0,
                 hitFlashTimer: 0,
-                // NEW: Guardian specific attack timer
                 attackCooldown: 120 
             };
-            const GROUND_Y = canvas.height - 80;
-            riftGuardian.x = canvas.width - riftGuardian.w - 50; // Set initial position to the right
+            
+            riftGuardian.x = canvas.width - riftGuardian.w - 50; 
 
-            // ===== INPUT (updated for dialogue) =====
+            // ===== INPUT =====
             const keys = {};
             document.addEventListener("keydown", e => {
+                const k = e.key.toLowerCase();
                 if (gameState === 'dialogue' && e.key === ' ') {
                     e.preventDefault();
                     advanceDialogue();
                     return;
                 }
-                keys[e.key.toLowerCase()] = true;
+                if (gameState === 'post-combat' && door.active && k === 'e') {
+                    if (Math.abs((player.x + player.w/2) - (door.x + door.w/2)) < 60) {
+                        enterRiftopia();
+                    }
+                }
+                keys[k] = true;
             });
             document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
             
             let mouseDown = false;
             canvas.addEventListener("mousedown", (e) => {
-                if (e.button === 0 && gameState === 'combat') mouseDown = true;
+                if (e.button === 0 && (gameState === 'combat' || gameState === 'post-combat')) mouseDown = true;
             });
             canvas.addEventListener("mouseup", (e) => {
                 if (e.button === 0) mouseDown = false;
@@ -646,7 +712,7 @@
 
             let menuOpen = false;
             document.addEventListener("keydown", (e) => {
-                if (gameState !== 'combat') return; 
+                if (gameState !== 'combat' && gameState !== 'post-combat') return; 
                 if (e.key.toLowerCase() === "c") {
                     menuOpen = !menuOpen;
                     document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
@@ -665,7 +731,7 @@
                  }
             });
 
-            // ===== VFX ARRAYS (unchanged) =====
+            // ===== VFX ARRAYS =====
             const damageNumbers = [];
             const particles = [];
             const afterimages = []; 
@@ -675,7 +741,6 @@
             let screenShakeTime = 0;
             let shakeIntensity = 0;
 
-            // ZERO-POINT IMPACT State (unchanged)
             const zeroPoint = {
                 active: false,
                 timer: 0,
@@ -690,12 +755,11 @@
                 shakeIntensity = intensity;
             }
 
-            // ===== XP & LEVEL UP (unchanged) =====
+            // ===== XP & LEVEL UP =====
             function gainXP(amount) {
                 if (!player.alive) return;
                 player.xp += amount;
                 createDamageNumber(amount + " XP", player.x + player.w / 2, player.y - 20, "#00ff00");
-                
                 while (player.xp >= player.xpToNextLevel) {
                     levelUp();
                 }
@@ -706,10 +770,8 @@
                 player.level++;
                 player.xpToNextLevel = getXPForLevel(player.level);
                 player.unspentStatPoints += 3;
-
                 player.hp = player.maxHp;
                 player.energy = player.stats.energy;
-
                 triggerScreenShake(30, 15);
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#f0f", 80, 20);
                 createDamageNumber("LEVEL UP!", player.x + player.w / 2, player.y - 40, "#f0f");
@@ -718,7 +780,6 @@
             function distributeStat(stat) {
                 if (player.unspentStatPoints <= 0) return;
                 player.unspentStatPoints--;
-
                 if (stat === 'maxHp') {
                     player.maxHp += 10;
                     player.hp += 10;
@@ -731,125 +792,68 @@
                 updateStatsMenu();
             }
 
-            // ===== VFX HELPERS (unchanged) =====
+            // ===== VFX HELPERS =====
             function createDamageNumber(amount, x, y, color = "#ffffff") {
-                damageNumbers.push({
-                    text: Math.ceil(amount).toString(),
-                    x: x,
-                    y: y,
-                    velY: -3,
-                    velX: (Math.random() - 0.5) * 0.5,
-                    life: 60,
-                    color: color
-                });
+                damageNumbers.push({ text: Math.ceil(amount).toString(), x: x, y: y, velY: -3, velX: (Math.random() - 0.5) * 0.5, life: 60, color: color });
             }
 
             function spawnParticle(x, y, color) {
-                particles.push({
-                    x, y,
-                    size: Math.random() * 4 + 2,
-                    velX: (Math.random() * 4 - 2),
-                    velY: (Math.random() * -2),
-                    life: 15,
-                    color
-                });
+                particles.push({ x, y, size: Math.random() * 4 + 2, velX: (Math.random() * 4 - 2), velY: (Math.random() * -2), life: 15, color });
             }
 
             function burstParticles(x, y, color, count = 20, power = 4) {
                 for (let i = 0; i < count; i++) {
-                    particles.push({
-                        x, y,
-                        size: Math.random() * 5 + 3,
-                        velX: (Math.random() * power - power / 2),
-                        velY: (Math.random() * power - power / 2),
-                        life: 20,
-                        color
-                    });
+                    particles.push({ x, y, size: Math.random() * 5 + 3, velX: (Math.random() * power - power / 2), velY: (Math.random() * power - power / 2), life: 20, color });
                 }
             }
             
             function createDustParticle(x, y, directionX) {
-                particles.push({
-                    x: x + Math.random() * 10 - 5,
-                    y: y,
-                    size: Math.random() * 3 + 1,
-                    velX: (Math.random() * 2 - 1) + directionX * 1.5,
-                    velY: Math.random() * -2,
-                    life: 15,
-                    color: "#997755"
-                });
+                particles.push({ x: x + Math.random() * 10 - 5, y: y, size: Math.random() * 3 + 1, velX: (Math.random() * 2 - 1) + directionX * 1.5, velY: Math.random() * -2, life: 15, color: "#997755" });
             }
 
             function directionalBurst(x, y, color, count, directionX, spread = 0.5) {
                 for (let i = 0; i < count; i++) {
-                    particles.push({
-                        x, y,
-                        size: Math.random() * 4 + 2,
-                        velX: (directionX * (Math.random() * 8 + 4)) + (Math.random() * 2 - 1),
-                        velY: (Math.random() * -8) + 4,
-                        life: 25,
-                        color
-                    });
+                    particles.push({ x, y, size: Math.random() * 4 + 2, velX: (directionX * (Math.random() * 8 + 4)) + (Math.random() * 2 - 1), velY: (Math.random() * -8) + 4, life: 25, color });
                 }
             }
 
             function createAfterimage(x, y, w, h, color) {
-                afterimages.push({
-                    x, y, w, h,
-                    life: 15,
-                    color
-                });
+                afterimages.push({ x, y, w, h, life: 15, color });
             }
             
             function triggerFullFlash(color = "#ffffff", duration = 5) {
                 vfxQueue.push({ type: 'fullFlash', life: duration, color: color });
             }
 
-            // Updated Zero-Point impact trigger to use riftGuardian
             function triggerZeroPointImpactFromMultiplier(multiplier) {
                 const base = player.stats.strength * 1.5;
                 const finalDamage = base * multiplier;
-
                 const dist = Math.abs((player.x + player.w/2) - (riftGuardian.x + riftGuardian.w/2));
                 const range = 600;
                 if (riftGuardian.alive && dist < range) {
                     const knockback = 30 * multiplier;
                     dealDamageToGuardian(finalDamage, true, knockback);
                 }
-
                 vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: multiplier });
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ffffff", Math.max(20, 40 * multiplier), 18 * multiplier);
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff0000", Math.max(12, 30 * multiplier), 16 * multiplier);
                 triggerScreenShake(25, 16 * Math.min(multiplier / 2, 2.5));
-                setTimeout(() => {
-                    triggerFullFlash("#ffffff", 4);
-                }, 40);
+                setTimeout(() => { triggerFullFlash("#ffffff", 4); }, 40);
                 zeroPoint.cooldown = zeroPoint.cooldownMax;
             }
 
-            // ===== COMBAT SYSTEM (Updated to use riftGuardian) =====
+            // ===== COMBAT SYSTEM =====
             function rectCollide(a, b) {
                 return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + a.h && a.y + a.h > b.y;
             }
 
-            function getNPCBox() { // Renamed internally for clarity
-                const ground = GROUND_Y;
-                return {
-                    x: riftGuardian.x,
-                    y: riftGuardian.isAirborne ? riftGuardian.y : ground - riftGuardian.h,
-                    w: riftGuardian.w,
-                    h: riftGuardian.h
-                };
+            function getNPCBox() { 
+                return { x: riftGuardian.x, y: riftGuardian.isAirborne ? riftGuardian.y : GROUND_Y - riftGuardian.h, w: riftGuardian.w, h: riftGuardian.h };
             }
 
             function getAttackBox(customWidth) {
                 const width = customWidth || (20 + player.stats.strength * 1.5);
-                return {
-                    x: player.x + (player.facing === 1 ? player.w : -width),
-                    y: player.y,
-                    w: width,
-                    h: player.h
-                };
+                return { x: player.x + (player.facing === 1 ? player.w : -width), y: player.y, w: width, h: player.h };
             }
 
             function dealDamageToGuardian(amount, isAbility = false, knockbackForce = 0) {
@@ -860,10 +864,7 @@
                 if (rectCollide(hitbox, guardianBox) && riftGuardian.alive) {
                     let dmgColor = isAbility ? "#00ffff" : "#ffffff";
                     let isCrit = Math.random() < 0.1;
-                    if (isCrit) {
-                        finalDmg *= 1.5;
-                        dmgColor = "#ff00ff";
-                    }
+                    if (isCrit) { finalDmg *= 1.5; dmgColor = "#ff00ff"; }
                     if (player.berserkMode) finalDmg *= 1.25;
 
                     riftGuardian.hp -= finalDmg;
@@ -872,10 +873,8 @@
                     riftGuardian.velX = knockDir * knockbackForce;
 
                     riftGuardian.hitFlashTimer = 6;
-
                     directionalBurst(guardianBox.x + guardianBox.w/2, guardianBox.y + guardianBox.h/2, "#fff", 15, knockDir);
                     directionalBurst(guardianBox.x + guardianBox.w/2, guardianBox.y + guardianBox.h/2, "#ff0000", 10, knockDir / 4, 8);
-
                     vfxQueue.push({ type: 'impactRing', x: guardianBox.x + guardianBox.w/2, y: guardianBox.y + guardianBox.h/2, color: "#fff", life: 10, size: 5 });
 
                     combatMetrics.totalDamage += finalDmg;
@@ -885,9 +884,7 @@
                     combatMetrics.maxCombo = Math.max(combatMetrics.maxCombo, combatMetrics.comboCount);
 
                     document.getElementById('comboCounter').style.transform = 'scale(1.2)';
-                    setTimeout(() => {
-                        document.getElementById('comboCounter').style.transform = 'scale(1.0)';
-                    }, 50);
+                    setTimeout(() => { document.getElementById('comboCounter').style.transform = 'scale(1.0)'; }, 50);
 
                     if (isAbility) triggerScreenShake(15, 10);
                     else triggerScreenShake(8, 4);
@@ -897,103 +894,100 @@
                     
                     if (riftGuardian.hp <= 0 && riftGuardian.alive) {
                         riftGuardian.alive = false;
-                        transitionToScene2(); 
+                        activatePostBossPhase(); // CHANGED: Trigger post-boss phase
                     }
                     
-                    // Progress tutorial
                     if (currentTutorialStep === 0 && finalDmg > 0) nextTutorialStep();
                     if (currentTutorialStep === 1 && player.isDashing) nextTutorialStep();
                     if (currentTutorialStep === 2 && zeroPoint.charged) nextTutorialStep();
                 }
             }
 
+            function activatePostBossPhase() {
+                gameState = 'post-combat';
+                document.getElementById('npcHpBar').style.display = 'none';
+                document.getElementById('questTracker').style.display = 'block';
+                
+                // Big Explosion where boss was
+                triggerFullFlash("#ffaa00", 10);
+                burstParticles(riftGuardian.x + riftGuardian.w/2, riftGuardian.y + riftGuardian.h/2, "#ffaa00", 100, 25);
+                triggerScreenShake(30, 20);
+
+                // Give Reward
+                player.inventory.shards++;
+                const notif = document.getElementById('itemNotification');
+                notif.style.transform = "translate(-50%, -50%) scale(1)";
+                setTimeout(() => { notif.style.transform = "translate(-50%, -50%) scale(0)"; }, 4000);
+
+                // Spawn Door
+                door.x = riftGuardian.x;
+                door.active = true;
+
+                updateQuest("Into the Unknown", "Enter the Rift Portal.");
+            }
+
             function dealDamageToPlayer(amount) {
                 if (player.invincible) return;
-
                 let incomingDmg = amount;
                 let guardianDir = (player.x + player.w/2 < riftGuardian.x + riftGuardian.w/2) ? 1 : -1; 
-                
                 if (player.isBlocking) {
                     incomingDmg *= 0.1;
                     createDamageNumber("Block!", player.x + player.w / 2, player.y - 10, "#888");
                     directionalBurst(player.x + player.w/2, player.y + player.h/2, "#00ccff", 10, -guardianDir);
-                    // Progress tutorial
                     if (currentTutorialStep === 3) nextTutorialStep();
                 } else {
                     triggerScreenShake(10, 5);
                     directionalBurst(player.x + player.w/2, player.y + player.h/2, "#ffaa00", 15, -guardianDir);
                 }
-
                 incomingDmg = incomingDmg - player.stats.defense;
                 if (incomingDmg < 1) incomingDmg = 1;
-
                 if (player.stats.reflectDamage > 0) {
                     let reflectedDmg = incomingDmg * player.stats.reflectDamage;
                     dealDamageToGuardian(reflectedDmg, true, 2); 
                     createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", riftGuardian.x + riftGuardian.w / 2, riftGuardian.y - 10, "#00ff00");
                 }
-
                 player.hp -= incomingDmg;
                 if (player.hp < 0) player.hp = 0;
-                
                 if (!player.isBlocking) {
                     player.x += -guardianDir * 10;
                     player.velX = -guardianDir * 5;
                 }
             }
             
-            // Replaced periodic NPC attack with a proper Guardian AI loop
             function guardianAI() {
                 if (!riftGuardian.alive || gameState !== 'combat') return;
-
                 const distance = Math.abs(player.x - riftGuardian.x);
                 const guardianDir = (player.x < riftGuardian.x) ? -1 : 1;
-                
-                if (riftGuardian.attackCooldown > 0) {
-                    riftGuardian.attackCooldown--;
-                    return;
-                }
-
+                if (riftGuardian.attackCooldown > 0) { riftGuardian.attackCooldown--; return; }
                 if (distance < 100) {
-                    // Close range attack
                     dealDamageToPlayer(20);
                     riftGuardian.attackCooldown = 90;
-                    riftGuardian.velX = -guardianDir * 5; // Slight step-back
+                    riftGuardian.velX = -guardianDir * 5; 
                     triggerScreenShake(5, 3);
                 } else if (distance < 300) {
-                    // Charge attack
                     riftGuardian.velX = guardianDir * 10;
                     riftGuardian.attackCooldown = 150;
                 } else {
-                    // Move closer
                     riftGuardian.velX = guardianDir * 2;
                 }
             }
-            setInterval(guardianAI, 16); // Run AI on a timed interval
+            setInterval(guardianAI, 16); 
 
-            // Updated universalPunch to use riftGuardian
             function universalPunch() {
                 if (player.attackCooldown <= 0) {
                     player.attackTime = 10;
                     player.attackCooldown = 20;
                     let damage = player.stats.strength * 1.5; 
                     let moveType = 'Punch';
-                    
                     const onGround = player.y + player.h >= GROUND_Y;
                     let knockback = 4;
-                    
                     if (!onGround) {
                         if (player.velY < 0) {
-                            damage *= 1.8;
-                            moveType = 'Uppercut';
-                            knockback = 1;
+                            damage *= 1.8; moveType = 'Uppercut'; knockback = 1;
                         } else if (player.velY > 0) {
-                            damage *= 2.2;
-                            moveType = 'Downslam';
-                            knockback = 0;
+                            damage *= 2.2; moveType = 'Downslam'; knockback = 0;
                         }
                     }
-
                     if (zeroPoint.charged) {
                         const mul = 2.5 + Math.random() * 0.5;
                         damage *= mul;
@@ -1002,46 +996,32 @@
                         burstParticles(player.x + player.w/2, player.y + player.h/2, "#ffffff", Math.max(20, 40 * mul), 18 * mul);
                         triggerScreenShake(30, 20 * mul);
                         triggerFullFlash("#ffffff", 4);
-                        
-                        // Progress tutorial
                         if (currentTutorialStep === 2) nextTutorialStep();
-
-                        zeroPoint.charged = false;
-                        zeroPoint.active = false;
-                        zeroPoint.timer = 0;
-                        zeroPoint.cooldown = zeroPoint.cooldownMax;
+                        zeroPoint.charged = false; zeroPoint.active = false; zeroPoint.timer = 0; zeroPoint.cooldown = zeroPoint.cooldownMax;
                     }
-
                     dealDamageToGuardian(damage, false, knockback);
-                    
                     let guardianBox = getNPCBox();
                     let hitbox = getAttackBox();
-
                     if (rectCollide(hitbox, guardianBox) && riftGuardian.alive) {
                         if (moveType === 'Uppercut') {
                             vfxQueue.push({ type: 'shockwave', x: riftGuardian.x + riftGuardian.w / 2, y: riftGuardian.y + riftGuardian.h / 2, color: "#ffffff", life: 15, radius: 10, maxRadius: 150 });
                             burstParticles(riftGuardian.x + riftGuardian.w / 2, riftGuardian.y + riftGuardian.h / 2, "#fff", 80, 15);
                             triggerScreenShake(15, 8);
-
                             riftGuardian.isAirborne = true;
                             riftGuardian.airborneVelY = -25;
                             riftGuardian.airborneLife = 30;
                             riftGuardian.velX = 0;
-                            
                             player.velY = -15; 
                             player.jumpCount = player.maxJumps; 
                         } else if (moveType === 'Downslam') {
                             vfxQueue.push({ type: 'shockwave', x: riftGuardian.x + riftGuardian.w / 2, y: GROUND_Y, color: "#ff0000", life: 30, radius: 20, maxRadius: 800 });
                             burstParticles(riftGuardian.x + riftGuardian.w / 2, riftGuardian.y + riftGuardian.h / 2, "#ff0000", 120, 20);
                             triggerScreenShake(30, 20);
-
                             riftGuardian.isAirborne = false; 
                             riftGuardian.airborneLife = 0;
                             riftGuardian.y = GROUND_Y - riftGuardian.h;
                             riftGuardian.velX = 0;
-                            
                             vfxQueue.push({ type: 'impactFlash', x: riftGuardian.x + riftGuardian.w / 2, y: GROUND_Y, color: "#ffaa00", life: 10 });
-
                             player.velY = 0;
                             player.y = GROUND_Y - player.h;
                             player.jumpCount = 0;
@@ -1050,11 +1030,8 @@
                 }
             }
 
-
-            // UNIVERSAL DASH (Updated to use riftGuardian for hit detection)
             function dashMove() {
                 if (abilityCooldowns[3] > 0 || player.stamina < 30 || player.isDashing) return;
-                
                 player.stamina -= 30;
                 abilityCooldowns[3] = 70;
                 player.dashTime = 15;
@@ -1062,18 +1039,12 @@
                 player.hasDashHit = false;
                 player.velX = player.facing * 18;
                 burstParticles(player.x, player.y + player.h / 2, "#4aff00", 30, 8);
-                
                 const interval = setInterval(() => {
-                    if (player.isDashing) {
-                        createAfterimage(player.x, player.y, player.w, player.h, "#00ff0055");
-                    } else {
-                        clearInterval(interval);
-                    }
+                    if (player.isDashing) { createAfterimage(player.x, player.y, player.w, player.h, "#00ff0055"); } else { clearInterval(interval); }
                 }, 40);
             }
 
-
-            // Abilities for builds (unchanged)...
+            // Abilities
             function speed_ability1() { } 
             function speed_ability2() { if (abilityCooldowns[1] > 0) return; abilityCooldowns[1] = 90; player.jumpCount = 0; player.velY = -12; burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3); }
             function speed_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 20) return; player.energy -= 20; abilityCooldowns[2] = 180; player.invincible = true; triggerScreenShake(15, 10); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 50, 15); setTimeout(()=>player.invincible=false,1000); }
@@ -1087,46 +1058,22 @@
             function energy_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 40) return; player.energy -= 40; abilityCooldowns[1] = 150; let dmg = player.stats.energy * 1.5; dealDamageToGuardian(dmg, true, 25); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); triggerScreenShake(20,12); }
             function energy_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[2] = 60; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); player.x += player.facing * 150; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); }
 
-            // ===================== INPUT HANDLER (Restricted by game state) =====================
-            function ability1() {
-                if (menuOpen || gameState !== 'combat') return;
-                if (savedBuild === 'Strength') strength_ability1();
-                else if (savedBuild === 'Defense') defense_ability1();
-                else if (savedBuild === 'Energy') energy_ability1();
-            }
-
-            function ability2() {
-                if (menuOpen || gameState !== 'combat') return;
-                if (savedBuild === 'Speed') speed_ability2();
-                else if (savedBuild === 'Strength') strength_ability2();
-                else if (savedBuild === 'Defense') defense_ability2();
-                else if (savedBuild === 'Energy') energy_ability2();
-            }
-
-            function ability3() {
-                if (menuOpen || gameState !== 'combat') return;
-                if (savedBuild === 'Speed') speed_ability3();
-                else if (savedBuild === 'Strength') strength_ability3();
-                else if (savedBuild === 'Defense') defense_ability3();
-                else if (savedBuild === 'Energy') energy_ability3();
-            }
+            function ability1() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat')) return; if (savedBuild === 'Strength') strength_ability1(); else if (savedBuild === 'Defense') defense_ability1(); else if (savedBuild === 'Energy') energy_ability1(); }
+            function ability2() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat')) return; if (savedBuild === 'Speed') speed_ability2(); else if (savedBuild === 'Strength') strength_ability2(); else if (savedBuild === 'Defense') defense_ability2(); else if (savedBuild === 'Energy') energy_ability2(); }
+            function ability3() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat')) return; if (savedBuild === 'Speed') speed_ability3(); else if (savedBuild === 'Strength') strength_ability3(); else if (savedBuild === 'Defense') defense_ability3(); else if (savedBuild === 'Energy') energy_ability3(); }
 
             document.addEventListener("keydown", (e) => {
-                if (gameState !== 'combat') return;
-
+                if (gameState !== 'combat' && gameState !== 'post-combat') return;
                 if (e.key === "1") ability1();
                 if (e.key === "2") ability2();
                 if (e.key === "3") ability3();
                 if (e.key.toLowerCase() === 'r') {
                     if ((zeroPoint.active && !zeroPoint.charged) || zeroPoint.charged) {
                         const progress = Math.min(1, zeroPoint.timer / zeroPoint.duration);
-                        const minMul = 2.5;
-                        const maxMul = 3.0;
+                        const minMul = 2.5; const maxMul = 3.0;
                         const mul = 1 + (minMul - 1) * progress + Math.random() * ((maxMul - minMul) * progress);
                         triggerZeroPointImpactFromMultiplier(mul);
-                        zeroPoint.charged = false;
-                        zeroPoint.active = false;
-                        zeroPoint.timer = 0;
+                        zeroPoint.charged = false; zeroPoint.active = false; zeroPoint.timer = 0;
                         document.getElementById('zeroPointHint').style.display = 'none';
                     }
                 }
@@ -1134,14 +1081,12 @@
 
             canvas.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                if (zeroPoint.cooldown > 0 || menuOpen || gameState !== 'combat') return;
+                if (zeroPoint.cooldown > 0 || menuOpen || (gameState !== 'combat' && gameState !== 'post-combat')) return;
                 startZeroPointCharge();
             });
 
             function startZeroPointCharge() {
-                zeroPoint.active = true;
-                zeroPoint.timer = 0;
-                zeroPoint.charged = false;
+                zeroPoint.active = true; zeroPoint.timer = 0; zeroPoint.charged = false;
                 document.getElementById('zeroPointHint').style.display = 'block';
                 burstParticles(player.x + player.w/2, player.y + player.h/2, "#ff2244", 18, 8);
             }
@@ -1153,33 +1098,43 @@
             }
             
             function updateCombatMetrics() {
-                if (combatMetrics.comboTimer > 0) {
-                    combatMetrics.comboTimer--;
-                } else if (combatMetrics.comboCount > 0) {
-                    combatMetrics.comboCount = 0;
-                }
+                if (combatMetrics.comboTimer > 0) { combatMetrics.comboTimer--; } else if (combatMetrics.comboCount > 0) { combatMetrics.comboCount = 0; }
                 const threeSecondsAgo = Date.now() - 3000;
                 combatMetrics.damageLog = combatMetrics.damageLog.filter(entry => entry.time > threeSecondsAgo);
                 const recentDamage = combatMetrics.damageLog.reduce((sum, entry) => sum + entry.damage, 0);
                 combatMetrics.dps = recentDamage / 3.0;
             }
             
-            // ===== NEW: Dialogue & Quest System Logic =====
+            // ===== DIALOGUE & NARRATIVE =====
             const monologueLines = [
                 { speaker: "???", text: "Where... Where am I? The last thing I remember was the surge, the collapse..." },
                 { speaker: "???", text: "This place... it feels like the edge of everything. A fractured reality. And why do I feel this... power? I should be dead." },
-                { speaker: "Whisper", text: "Remeber... the Code..." },
+                { speaker: "Whisper", text: "Remember... the Code..." },
                 { speaker: "???", text: "What was that? A whisper? No time for that. There's... something moving on the horizon." },
                 { speaker: "Rift Guardian", text: "INTRUDER. YOU WILL NOT PASS THE FRACTURE POINT. EXECUTING DECONSTRUCTION PROTOCOL." },
                 { speaker: "???", text: "A Guardian. Figures. If I can't think my way out of this, I'll have to punch my way through." },
             ];
+            
+            const scene2Dialogue = [
+                { speaker: "Mira", text: "You made it through. I wasn't sure if you had enough stability to cross the threshold." },
+                { speaker: "???", text: "Who are you? Where is this place?" },
+                { speaker: "Mira", text: "I am Mira, an Echo of this realm. Welcome to Riftopia. Or what's left of it." },
+                { speaker: "Mira", text: "I sense... a piece of the Source code within you. That Memory Shard you hold. It belongs to you." },
+                { speaker: "Mira", text: "Be careful. The Warden knows you are here." },
+                { speaker: "???", text: "The Warden... I know that name. It feels... cold. Hateful." },
+                { speaker: "Mira", text: "He is the architect of this fracture. And he does not tolerate anomalies like us." },
+            ];
+
             let currentMonologueIndex = 0;
+            let currentDialogueArray = monologueLines;
             let typingTimer = null;
 
-            function startDialogue() {
+            function startDialogue(dialogueSet = monologueLines) {
                 gameState = 'dialogue';
+                currentDialogueArray = dialogueSet;
+                currentMonologueIndex = 0;
                 document.getElementById('dialogueBox').style.display = 'block';
-                typeMonologue(monologueLines[currentMonologueIndex]);
+                typeMonologue(currentDialogueArray[currentMonologueIndex]);
             }
 
             function typeMonologue(line) {
@@ -1193,7 +1148,7 @@
                     if (i < line.text.length) {
                         textElement.innerText += line.text.charAt(i);
                         i++;
-                        typingTimer = setTimeout(typeChar, line.speaker === "???" ? 40 : 60);
+                        typingTimer = setTimeout(typeChar, 40);
                     } else {
                         document.getElementById('dialogueContinue').style.display = 'block';
                     }
@@ -1203,53 +1158,62 @@
             }
 
             function advanceDialogue() {
-                if (typingTimer) { // If still typing, show full text
+                if (typingTimer) { 
                     clearTimeout(typingTimer);
-                    document.getElementById('dialogueText').innerText = monologueLines[currentMonologueIndex].text;
+                    document.getElementById('dialogueText').innerText = currentDialogueArray[currentMonologueIndex].text;
                     document.getElementById('dialogueContinue').style.display = 'block';
                     typingTimer = null;
                     return;
                 }
 
                 currentMonologueIndex++;
-                if (currentMonologueIndex < monologueLines.length) {
-                    typeMonologue(monologueLines[currentMonologueIndex]);
+                if (currentMonologueIndex < currentDialogueArray.length) {
+                    typeMonologue(currentDialogueArray[currentMonologueIndex]);
                 } else {
                     document.getElementById('dialogueBox').style.display = 'none';
-                    startCombat();
+                    if (currentDialogueArray === monologueLines) {
+                        startCombat();
+                    } else if (currentDialogueArray === scene2Dialogue) {
+                        gameState = 'scene2'; // Or 'roam' logic for Scene 2
+                    }
                 }
             }
 
             function startCombat() {
                 gameState = 'combat';
                 document.getElementById('questTracker').style.display = 'block';
-                riftGuardian.x = canvas.width - riftGuardian.w - 150; // Place Guardian to the right
-                player.x = 150; // Place player to the left
+                riftGuardian.x = canvas.width - riftGuardian.w - 150; 
+                player.x = 150; 
                 document.getElementById('npcHpBar').style.display = 'block';
                 updateQuest('Defeat the Rift Guardian', 'Destroy the entity blocking your path.');
                 startTutorial();
                 startWhispers();
             }
             
-            function transitionToScene2() {
+            function enterRiftopia() {
                 gameState = 'scene2';
                 document.getElementById('npcHpBar').style.display = 'none';
                 document.getElementById('questTracker').style.display = 'none';
                 document.getElementById('combatInfo').style.display = 'none';
                 document.getElementById('abilityBar').style.display = 'none';
+                document.getElementById('interactHint').style.display = 'none';
                 
-                triggerFullFlash("#0ff", 30);
+                triggerFullFlash("#0ff", 40);
                 triggerScreenShake(60, 25);
                 
-                document.getElementById('dialogueBox').style.display = 'block';
-                document.getElementById('dialogueSpeaker').innerText = "???";
-                document.getElementById('dialogueText').innerText = "The Guardian is shattered. The path is open. I remember... something.";
-                document.getElementById('dialogueContinue').style.display = 'none';
-
-                // Placeholder for scene transition
+                // Reposition Player
+                player.x = 100;
+                player.y = GROUND_Y - player.h;
+                camX = 0; // Reset camera
+                
+                // Setup Mira
+                mira.active = true;
+                mira.x = 500;
+                
+                // Start Dialogue after flash clears
                 setTimeout(() => {
-                    document.getElementById('dialogueText').innerText = "FRACTURE: SCENE TWO - TO BE CONTINUED";
-                }, 5000);
+                    startDialogue(scene2Dialogue);
+                }, 1000);
             }
             
             function updateQuest(title, text) {
@@ -1257,7 +1221,7 @@
                 document.getElementById('questText').innerText = text;
             }
 
-            // ===== NEW: Tutorial System =====
+            // ===== TUTORIAL =====
             const tutorialSteps = [
                 { text: `Your first objective is simple: **Punch** the Guardian! Use <span class="tutorialKey">LMB</span> to attack.`, check: () => combatMetrics.totalDamage > 0, complete: 'Good! You connected. Now, master evasion.' },
                 { text: `The Guardian will try to hit you. Use your **Dash** to evade! Press <span class="tutorialKey">Q</span> to dash.`, check: () => player.isDashing, complete: 'Great dash! You can also chain abilities with your dash.' },
@@ -1274,20 +1238,14 @@
             }
             
             function updateTutorial() {
-                if (currentTutorialStep >= tutorialSteps.length) {
-                    document.getElementById('tutorialBar').style.opacity = 0;
-                    return;
-                }
+                if (currentTutorialStep >= tutorialSteps.length) { document.getElementById('tutorialBar').style.opacity = 0; return; }
                 document.getElementById('tutorialBar').innerHTML = tutorialSteps[currentTutorialStep].text;
             }
             
             function nextTutorialStep() {
                 if (currentTutorialStep >= tutorialSteps.length) return;
-                
-                // Flash green on completion
                 document.getElementById('tutorialBar').style.backgroundColor = 'rgba(0, 150, 0, 0.85)';
                 document.getElementById('tutorialBar').innerHTML = tutorialSteps[currentTutorialStep].complete;
-                
                 setTimeout(() => {
                     currentTutorialStep++;
                     document.getElementById('tutorialBar').style.backgroundColor = 'rgba(20, 20, 50, 0.85)';
@@ -1295,56 +1253,32 @@
                 }, 1500);
             }
 
-            // ===== NEW: Whisper System =====
-            const whispers = [
-                "Remember your name.",
-                "The Code is calling.",
-                "Fracture... it is you.",
-                "Wake up!",
-                "Find the source.",
-                "Your true form awaits."
-            ];
+            // ===== WHISPERS =====
+            const whispers = [ "Remember your name.", "The Code is calling.", "Fracture... it is you.", "Wake up!", "Find the source.", "Your true form awaits." ];
             let lastWhisperTime = Date.now();
-            const WHISPER_INTERVAL = 10000; // 10 seconds
+            const WHISPER_INTERVAL = 10000;
 
-            function startWhispers() {
-                lastWhisperTime = Date.now();
-                whisperLoop();
-            }
-
+            function startWhispers() { lastWhisperTime = Date.now(); whisperLoop(); }
             function whisperLoop() {
                 if (gameState !== 'combat' || !riftGuardian.alive) return;
-
                 if (Date.now() - lastWhisperTime > WHISPER_INTERVAL) {
                     const whisperElement = document.getElementById('whispers');
                     const randomWhisper = whispers[Math.floor(Math.random() * whispers.length)];
-                    
                     whisperElement.innerText = randomWhisper;
                     whisperElement.style.opacity = 1;
-
-                    setTimeout(() => {
-                        whisperElement.style.opacity = 0;
-                    }, 3000); // Display for 3 seconds
-
+                    setTimeout(() => { whisperElement.style.opacity = 0; }, 3000);
                     lastWhisperTime = Date.now();
                 }
-                
-                // Check if tutorial step is complete
-                if (currentTutorialStep < tutorialSteps.length && tutorialSteps[currentTutorialStep].check()) {
-                    nextTutorialStep();
-                }
-
+                if (currentTutorialStep < tutorialSteps.length && tutorialSteps[currentTutorialStep].check()) { nextTutorialStep(); }
                 requestAnimationFrame(whisperLoop);
             }
 
-
-            // ===== UPDATE LOOP (Restricted by game state) =====
+            // ===== UPDATE LOOP =====
             function update() {
-                if (menuOpen || gameState === 'dialogue' || gameState === 'scene2') return;
+                if (menuOpen || gameState === 'dialogue') return;
 
                 // --- ZERO-POINT UPDATE ---
                 if (zeroPoint.cooldown > 0) zeroPoint.cooldown--;
-
                 if (zeroPoint.active) {
                     zeroPoint.timer++;
                     if (zeroPoint.timer >= zeroPoint.duration) {
@@ -1353,51 +1287,34 @@
                     } else {
                         document.getElementById('zeroPointHint').innerText = 'Zero-Point Charging...';
                     }
-
-                    const lingerFrames = 180;
-                    if (!zeroPoint.charged && zeroPoint.timer > zeroPoint.duration + 30) {
-                        zeroPoint.active = false;
-                        zeroPoint.timer = 0;
-                        document.getElementById('zeroPointHint').style.display = 'none';
-                    } else if (zeroPoint.charged && zeroPoint.timer > zeroPoint.duration + lingerFrames) {
-                        zeroPoint.active = false;
-                        zeroPoint.timer = 0;
-                        zeroPoint.charged = false;
-                        document.getElementById('zeroPointHint').style.display = 'none';
+                    if ((!zeroPoint.charged && zeroPoint.timer > zeroPoint.duration + 30) || (zeroPoint.charged && zeroPoint.timer > zeroPoint.duration + 180)) {
+                        zeroPoint.active = false; zeroPoint.timer = 0; zeroPoint.charged = false; document.getElementById('zeroPointHint').style.display = 'none';
                     }
                 }
 
-                // --- UPDATE RIFT GUARDIAN PHYSICS (KNOCKBACK) ---
-                if (riftGuardian.alive) {
-                    riftGuardian.x += riftGuardian.velX;
-                    riftGuardian.velX *= 0.9;
+                // --- PHYSICS UPDATES ---
+                if (gameState === 'combat' && riftGuardian.alive) {
+                    riftGuardian.x += riftGuardian.velX; riftGuardian.velX *= 0.9;
                     if (Math.abs(riftGuardian.velX) < 0.5) riftGuardian.velX = 0;
-                    
                     if (riftGuardian.hitFlashTimer > 0) riftGuardian.hitFlashTimer--;
-
                     if (riftGuardian.x < 50) riftGuardian.x = 50;
                     if (riftGuardian.x > canvas.width - riftGuardian.w - 50) riftGuardian.x = canvas.width - riftGuardian.w - 50;
-                }
-
-                if (riftGuardian.isAirborne) {
-                    const currentGroundY = canvas.height - 80;
-                    riftGuardian.airborneVelY += 1.2; 
-                    riftGuardian.y += riftGuardian.airborneVelY;
-                    riftGuardian.airborneLife--;
                     
-                    if (riftGuardian.airborneLife <= 0 || riftGuardian.y + riftGuardian.h >= currentGroundY) {
-                         riftGuardian.isAirborne = false;
-                         riftGuardian.y = currentGroundY - riftGuardian.h;
-                         vfxQueue.push({ type: 'impactFlash', x: riftGuardian.x + riftGuardian.w / 2, y: currentGroundY, color: "#ffaa00", life: 10 });
+                    if (riftGuardian.isAirborne) {
+                        riftGuardian.airborneVelY += 1.2; 
+                        riftGuardian.y += riftGuardian.airborneVelY;
+                        riftGuardian.airborneLife--;
+                        if (riftGuardian.airborneLife <= 0 || riftGuardian.y + riftGuardian.h >= GROUND_Y) {
+                             riftGuardian.isAirborne = false; riftGuardian.y = GROUND_Y - riftGuardian.h;
+                             vfxQueue.push({ type: 'impactFlash', x: riftGuardian.x + riftGuardian.w / 2, y: GROUND_Y, color: "#ffaa00", life: 10 });
+                        }
                     }
                 }
 
-                // --- PLAYER MOVEMENT & PHYSICS ---
+                // Player Physics (Applied in combat, post-combat, and scene2)
                 player.wasOnGround = player.onGround;
                 const oldVelY = player.velY;
-                
                 player.velY += 1.0;
-                
                 if (!player.onGround) player.velX *= 0.98;
 
                 if (keys["a"]) player.facing = -1;
@@ -1405,31 +1322,18 @@
                 
                 let moveSpeed = player.stats.speed;
                 const isMovingHorizontally = keys["a"] || keys["d"];
-
                 const isSprintingAttempt = keys["shift"] && player.stamina > 0 && isMovingHorizontally && !player.isBlocking;
                 const wasSprinting = player.isSprinting;
                 player.isSprinting = isSprintingAttempt && player.onGround && !player.isDashing;
                 player.justStartedSprinting = player.isSprinting && !wasSprinting;
 
-
-                if (player.isDashing) {
-                } else if (player.isBlocking) {
-                    moveSpeed *= 0.3;
-                } else if (player.isSprinting) {
-                    moveSpeed *= 1.7;
-                }
+                if (player.isBlocking) moveSpeed *= 0.3;
+                else if (player.isSprinting) moveSpeed *= 1.7;
                 
-                if (player.isBlocking && player.stamina > 0) {
-                    player.stamina -= 0.8;
-                } else if (player.isSprinting) {
-                    player.stamina -= 0.5;
-                } else {
-                    player.stamina += 0.4;
-                }
-                player.stamina = Math.max(0, Math.min(100, player.stamina));
-                player.energy += 0.5;
-                player.energy = Math.min(player.stats.energy, player.energy);
-
+                if (player.isBlocking && player.stamina > 0) player.stamina -= 0.8;
+                else if (player.isSprinting) player.stamina -= 0.5;
+                else player.stamina = Math.min(100, player.stamina + 0.4);
+                player.energy = Math.min(player.stats.energy, player.energy + 0.5);
 
                 if (!player.isDashing) { 
                     if (keys["a"]) player.velX = -moveSpeed;
@@ -1439,101 +1343,64 @@
                     player.velX *= 0.95;
                 }
                 
-                // Sprint dust
-                if (player.justStartedSprinting) {
-                    for(let i = 0; i < 10; i++) createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
-                }
-                if (player.isSprinting && Math.random() < 0.35) createDustParticle(player.x + player.w / 2, GROUND_Y, -player.facing);
+                if (player.justStartedSprinting) for(let i=0;i<10;i++) createDustParticle(player.x + player.w/2, GROUND_Y, -player.facing);
+                if (player.isSprinting && Math.random() < 0.35) createDustParticle(player.x + player.w/2, GROUND_Y, -player.facing);
 
                 if (keys[" "] && player.jumpCount < player.maxJumps) {
                     player.velY = -12;
                     burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3);
-                    player.jumpCount++;
-                    keys[" "] = false;
-                    player.onGround = false;
+                    player.jumpCount++; keys[" "] = false; player.onGround = false;
                 }
 
                 player.x += player.velX;
                 player.y += player.velY;
-                const ground = GROUND_Y;
                 
-                
-                if (player.y + player.h >= ground) {
+                if (player.y + player.h >= GROUND_Y) {
                     if (!player.wasOnGround && oldVelY > 5) {
-                        for(let i = 0; i < 16; i++) createDustParticle(player.x + player.w / 2, ground, 0);
+                        for(let i=0;i<16;i++) createDustParticle(player.x + player.w/2, GROUND_Y, 0);
                         triggerScreenShake(3, 2);
                     }
-
-                    player.y = ground - player.h;
-                    player.velY = 0;
-                    player.jumpCount = 0;
-                    player.onGround = true;
+                    player.y = GROUND_Y - player.h; player.velY = 0; player.jumpCount = 0; player.onGround = true;
                 } else {
                     player.onGround = false;
                 }
                 
-                // --- DASHING & COMBAT ---
-                if (player.isDashing && riftGuardian.alive && !player.hasDashHit) {
-                    let dashHitbox = { x: player.x, y: player.y, w: player.w, h: player.h };
-                    let guardianBox = getNPCBox();
-
-                    if (rectCollide(dashHitbox, guardianBox)) {
-                        const dashPunchDamage = player.stats.strength * 2.5;
-                        dealDamageToGuardian(dashPunchDamage, true, 12);
-
-                        player.velX = 0;
-                        player.isDashing = false; 
-                        player.dashTime = 0; 
-                        player.hasDashHit = true;
-
-                        player.attackTime = 10;
-                        triggerScreenShake(15, 8);
+                // Dash Hit Logic (Combat Only)
+                if (gameState === 'combat' && player.isDashing && riftGuardian.alive && !player.hasDashHit) {
+                    if (rectCollide({ x: player.x, y: player.y, w: player.w, h: player.h }, getNPCBox())) {
+                        dealDamageToGuardian(player.stats.strength * 2.5, true, 12);
+                        player.velX = 0; player.isDashing = false; player.dashTime = 0; player.hasDashHit = true;
+                        player.attackTime = 10; triggerScreenShake(15, 8);
                     }
                 }
                 
                 if (player.dashTime > 0) player.dashTime--;
-                
-                if (player.isDashing && player.dashTime <= 0) {
-                    player.isDashing = false;
-                    player.velX *= 0.8; 
-                }
-
+                if (player.isDashing && player.dashTime <= 0) { player.isDashing = false; player.velX *= 0.8; }
                 if (player.dashCooldown > 0) player.dashCooldown--;
 
-                if (mouseDown) universalPunch();
+                if (mouseDown && (gameState === 'combat' || gameState === 'post-combat')) universalPunch();
                 if (player.attackTime > 0) player.attackTime--;
                 if (player.attackCooldown > 0) player.attackCooldown--;
 
-                // --- VFX & UI UPDATES ---
-                for (let i = particles.length - 1; i >= 0; i--) {
-                    let p = particles[i];
-                    p.x += p.velX;
-                    p.y += p.velY;
-                    p.life--;
-                    p.size *= 0.92;
-                    if (p.life <= 0) particles.splice(i, 1);
-                }
-                for (let i = damageNumbers.length - 1; i >= 0; i--) {
-                    let d = damageNumbers[i];
-                    d.y += d.velY;
-                    d.x += d.velX;
-                    d.velY *= 0.96;
-                    d.life--;
-                    if (d.life <= 0) damageNumbers.splice(i, 1);
-                }
-                for (let i = afterimages.length - 1; i >= 0; i--) { 
-                    afterimages[i].life--;
-                    if (afterimages[i].life <= 0) afterimages.splice(i, 1);
-                }
-                for (let i = vfxQueue.length - 1; i >= 0; i--) {
-                    vfxQueue[i].life--;
-                    if (vfxQueue[i].life <= 0) vfxQueue.splice(i, 1);
+                // --- DOOR INTERACTION CHECK ---
+                if (gameState === 'post-combat' && door.active) {
+                    const dist = Math.abs((player.x + player.w/2) - (door.x + door.w/2));
+                    if (dist < 60) {
+                        document.getElementById('interactHint').style.display = 'block';
+                    } else {
+                        document.getElementById('interactHint').style.display = 'none';
+                    }
+                    if (door.alpha < 1) door.alpha += 0.05;
                 }
 
+                // --- VFX ---
+                for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.velX; p.y += p.velY; p.life--; p.size *= 0.92; if (p.life <= 0) particles.splice(i, 1); }
+                for (let i = damageNumbers.length - 1; i >= 0; i--) { let d = damageNumbers[i]; d.y += d.velY; d.x += d.velX; d.velY *= 0.96; d.life--; if (d.life <= 0) damageNumbers.splice(i, 1); }
+                for (let i = afterimages.length - 1; i >= 0; i--) { afterimages[i].life--; if (afterimages[i].life <= 0) afterimages.splice(i, 1); }
+                for (let i = vfxQueue.length - 1; i >= 0; i--) { vfxQueue[i].life--; if (vfxQueue[i].life <= 0) vfxQueue.splice(i, 1); }
 
                 updateAbilityCooldowns();
                 updateCombatMetrics(); 
-
                 if (screenShakeTime > 0) screenShakeTime--;
                 camX += ((player.x - canvas.width / 2) - camX) * 0.08;
 
@@ -1542,7 +1409,7 @@
                 updateCombatUI(); 
             }
 
-            // ===== UI UPDATES (Updated to use riftGuardian) =====
+            // ===== UI UPDATES =====
             function updateMainHUD() {
                 const hpRatio = player.hp / player.maxHp;
                 document.getElementById("hpBarInner").style.width = (hpRatio * 100) + "%";
@@ -1576,15 +1443,10 @@
             function updateCooldownUI() {
                 const maxCooldowns = [90, 90, 180, 70]; 
                 for (let i = 0; i < 3; i++) {
-                    const cooldown = abilityCooldowns[i];
-                    const max = maxCooldowns[i] || 1;
-                    let ratio = cooldown / max;
-                    if (ratio < 0) ratio = 0;
+                    const cooldown = abilityCooldowns[i]; const max = maxCooldowns[i] || 1; let ratio = cooldown / max; if (ratio < 0) ratio = 0;
                     document.getElementById("cool" + (i + 1)).style.clipPath = `inset(${ratio * 100}% 0 0 0)`;
                 }
-                const dashCooldown = abilityCooldowns[3];
-                const dashMax = maxCooldowns[3];
-                const dashRatio = dashCooldown / dashMax;
+                const dashCooldown = abilityCooldowns[3]; const dashMax = maxCooldowns[3]; const dashRatio = dashCooldown / dashMax;
                 document.getElementById("cool4").style.clipPath = `inset(${dashRatio * 100}% 0 0 0)`;
             }
             
@@ -1595,60 +1457,56 @@
                 document.getElementById('menuDef').innerText = player.stats.defense;
                 document.getElementById('menuHp').innerText = player.maxHp;
                 document.getElementById('menuEng').innerText = player.stats.energy;
-
                 const buttons = document.querySelectorAll('#statsMenu .statButton');
-                buttons.forEach(btn => {
-                    btn.style.display = player.unspentStatPoints > 0 ? 'inline-block' : 'none';
-                });
+                buttons.forEach(btn => { btn.style.display = player.unspentStatPoints > 0 ? 'inline-block' : 'none'; });
             }
 
             function updateCombatUI() {
                 document.getElementById('dpsMeter').innerText = `DPS: ${combatMetrics.dps.toFixed(1)}`;
                 const comboDisplay = document.getElementById('comboCounter');
-                if (combatMetrics.comboCount > 1) {
-                    comboDisplay.innerText = `${combatMetrics.comboCount}x COMBO`;
-                    comboDisplay.style.opacity = 1;
-                } else {
-                    comboDisplay.innerText = '';
-                    comboDisplay.style.opacity = 0;
-                }
+                if (combatMetrics.comboCount > 1) { comboDisplay.innerText = `${combatMetrics.comboCount}x COMBO`; comboDisplay.style.opacity = 1; }
+                else { comboDisplay.innerText = ''; comboDisplay.style.opacity = 0; }
             }
 
-            // ===== DRAW LOOP (Updated to draw Rift Guardian) =====
+            // ===== DRAW LOOP =====
             function draw() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
-                let shakeOffsetX = 0;
-                let shakeOffsetY = 0;
+                let shakeOffsetX = 0, shakeOffsetY = 0;
                 if (screenShakeTime > 0) {
                     shakeOffsetX = (Math.random() - 0.5) * shakeIntensity * 2;
                     shakeOffsetY = (Math.random() - 0.5) * shakeIntensity * 2;
                 }
 
-                const GROUND_Y_GLOBAL = canvas.height - 80;
-
-                // Parallax background (unchanged)
                 ctx.save(); 
                 ctx.translate(shakeOffsetX, shakeOffsetY);
-                const FAR_BG_FACTOR = 0.1;
-                ctx.fillStyle = "#000033"; 
-                let farX = (-camX * FAR_BG_FACTOR) % canvas.width;
-                ctx.fillRect(farX - canvas.width, 0, canvas.width, GROUND_Y_GLOBAL);
-                ctx.fillRect(farX, 0, canvas.width, GROUND_Y_GLOBAL);
-
-                const MID_BG_FACTOR = 0.3;
-                ctx.fillStyle = "#0a0a55";
-                let midX = (-camX * MID_BG_FACTOR) % 500; 
-                for (let i = -3; i < canvas.width / 500 + 3; i++) {
-                    ctx.fillRect(midX + i * 500, GROUND_Y_GLOBAL - 80, 50, 80);
-                    ctx.fillRect(midX + i * 500 + 100, GROUND_Y_GLOBAL - 150, 80, 150);
-                }
                 
-                const CLOSE_BG_FACTOR = 0.6;
-                ctx.fillStyle = "#151577";
-                let closeX = (-camX * CLOSE_BG_FACTOR) % 400; 
-                for (let i = -5; i < canvas.width / 400 + 5; i++) {
-                    ctx.fillRect(closeX + i * 400, GROUND_Y_GLOBAL - 40, 30, 40);
+                // BACKGROUND RENDERING
+                if (gameState === 'scene2') {
+                    // Riftopia Background (Purple/Teal theme)
+                    ctx.fillStyle = "#110022"; 
+                    let farX = (-camX * 0.1) % canvas.width;
+                    ctx.fillRect(farX - canvas.width, 0, canvas.width, GROUND_Y);
+                    ctx.fillRect(farX, 0, canvas.width, GROUND_Y);
+
+                    ctx.fillStyle = "#220044";
+                    let midX = (-camX * 0.3) % 500; 
+                    for (let i = -3; i < canvas.width / 500 + 3; i++) {
+                        ctx.fillRect(midX + i * 500, GROUND_Y - 180, 40, 180); // Tall pillars
+                    }
+                } else {
+                    // Standard Battlefield Background
+                    ctx.fillStyle = "#000033"; 
+                    let farX = (-camX * 0.1) % canvas.width;
+                    ctx.fillRect(farX - canvas.width, 0, canvas.width, GROUND_Y);
+                    ctx.fillRect(farX, 0, canvas.width, GROUND_Y);
+
+                    ctx.fillStyle = "#0a0a55";
+                    let midX = (-camX * 0.3) % 500; 
+                    for (let i = -3; i < canvas.width / 500 + 3; i++) {
+                        ctx.fillRect(midX + i * 500, GROUND_Y - 80, 50, 80);
+                        ctx.fillRect(midX + i * 500 + 100, GROUND_Y - 150, 80, 150);
+                    }
                 }
                 
                 ctx.restore();
@@ -1658,9 +1516,43 @@
                 ctx.translate(shakeOffsetX, shakeOffsetY);
                 ctx.translate(-camX, 0);
 
-                ctx.fillStyle = "#222";
-                ctx.fillRect(camX - 1000, GROUND_Y_GLOBAL, canvas.width + 2000, 80);
+                // Floor
+                ctx.fillStyle = gameState === 'scene2' ? "#330044" : "#222";
+                ctx.fillRect(camX - 1000, GROUND_Y, canvas.width + 2000, 80);
+                
+                // --- DRAW DOOR (Post-Combat) ---
+                if (gameState === 'post-combat' && door.active) {
+                    ctx.save();
+                    ctx.globalAlpha = door.alpha;
+                    // Portal glow
+                    ctx.shadowBlur = 20 + Math.sin(Date.now() / 200) * 10;
+                    ctx.shadowColor = "#0ff";
+                    ctx.fillStyle = "#000";
+                    ctx.fillRect(door.x, door.y, door.w, door.h);
+                    
+                    // Portal Inner swirling
+                    ctx.fillStyle = "#0ff";
+                    ctx.beginPath();
+                    ctx.arc(door.x + door.w/2, door.y + door.h/2, 20 + Math.sin(Date.now()/100)*5, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.restore();
+                }
 
+                // --- DRAW MIRA (Scene 2) ---
+                if (gameState === 'scene2' && mira.active) {
+                    ctx.save();
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = "#00ffaa";
+                    ctx.fillStyle = "#00cc88"; // Teal color for Mira
+                    ctx.fillRect(mira.x, mira.y, mira.w, mira.h);
+                    
+                    // Eyes
+                    ctx.fillStyle = "#fff";
+                    ctx.fillRect(mira.x + 5, mira.y + 10, 20, 5);
+                    ctx.restore();
+                }
+
+                // Afterimages
                 for (let img of afterimages) {
                     ctx.fillStyle = img.color;
                     ctx.globalAlpha = img.life / 15 * 0.5;
@@ -1669,59 +1561,39 @@
                 ctx.globalAlpha = 1;
 
                 // Draw Rift Guardian
-                if (riftGuardian.alive) {
-                    const guardianDrawY = riftGuardian.isAirborne ? riftGuardian.y : GROUND_Y_GLOBAL - riftGuardian.h;
+                if (riftGuardian.alive && gameState === 'combat') {
+                    const guardianDrawY = riftGuardian.isAirborne ? riftGuardian.y : GROUND_Y - riftGuardian.h;
                     if (riftGuardian.hitFlashTimer > 0) {
                         ctx.fillStyle = "#ffffff";
-                        ctx.shadowBlur = 20;
-                        ctx.shadowColor = "white";
+                        ctx.shadowBlur = 20; ctx.shadowColor = "white";
                     } else {
-                        // Guardian is a dark, shadowy figure with a red core
                         ctx.fillStyle = "#110000";
-                        ctx.shadowBlur = 15;
-                        ctx.shadowColor = "#ff3333";
+                        ctx.shadowBlur = 15; ctx.shadowColor = "#ff3333";
                     }
                     ctx.fillRect(riftGuardian.x, guardianDrawY, riftGuardian.w, riftGuardian.h);
                     ctx.shadowBlur = 0;
                     if(riftGuardian.isAirborne) {
-                        ctx.strokeStyle = "#ff0000";
-                        ctx.lineWidth = 1;
-                        ctx.globalAlpha = 0.5;
-                        ctx.beginPath();
-                        ctx.moveTo(riftGuardian.x + riftGuardian.w/2, guardianDrawY);
-                        ctx.lineTo(riftGuardian.x + riftGuardian.w/2, GROUND_Y_GLOBAL - riftGuardian.h);
-                        ctx.stroke();
-                        ctx.globalAlpha = 1;
+                        ctx.strokeStyle = "#ff0000"; ctx.lineWidth = 1; ctx.globalAlpha = 0.5;
+                        ctx.beginPath(); ctx.moveTo(riftGuardian.x + riftGuardian.w/2, guardianDrawY);
+                        ctx.lineTo(riftGuardian.x + riftGuardian.w/2, GROUND_Y - riftGuardian.h); ctx.stroke(); ctx.globalAlpha = 1;
                     }
                 }
 
-                // Draw Player (unchanged)
+                // Draw Player
                 ctx.fillStyle = "#4af";
-                if (player.invincible) {
-                    ctx.fillStyle = "#00ffff";
-                    ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.3;
-                } else if (player.berserkMode) {
-                    ctx.fillStyle = "#ff5555";
-                } else if (player.isBlocking) {
-                    ctx.fillStyle = "#aaa";
-                } else if (player.isDashing) {
-                    ctx.fillStyle = "#4aff00";
-                }
+                if (player.invincible) { ctx.fillStyle = "#00ffff"; ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.3; }
+                else if (player.berserkMode) { ctx.fillStyle = "#ff5555"; }
+                else if (player.isBlocking) { ctx.fillStyle = "#aaa"; }
+                else if (player.isDashing) { ctx.fillStyle = "#4aff00"; }
                 ctx.fillRect(player.x, player.y, player.w, player.h);
                 ctx.globalAlpha = 1;
 
                 if (player.isBlocking) {
-                    ctx.strokeStyle = "#ffffff";
-                    ctx.lineWidth = 3;
-                    ctx.globalAlpha = 0.8;
+                    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3; ctx.globalAlpha = 0.8;
                     ctx.beginPath();
-                    if (player.facing === 1) {
-                         ctx.arc(player.x + player.w, player.y + player.h / 2, 25, Math.PI / 2, -Math.PI / 2);
-                    } else {
-                         ctx.arc(player.x, player.y + player.h / 2, 25, -Math.PI / 2, Math.PI / 2);
-                    }
-                    ctx.stroke();
-                    ctx.globalAlpha = 1;
+                    if (player.facing === 1) ctx.arc(player.x + player.w, player.y + player.h / 2, 25, Math.PI / 2, -Math.PI / 2);
+                    else ctx.arc(player.x, player.y + player.h / 2, 25, -Math.PI / 2, Math.PI / 2);
+                    ctx.stroke(); ctx.globalAlpha = 1;
                 }
 
                 if (player.attackTime > 0) {
@@ -1730,161 +1602,70 @@
                     ctx.fillRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
                 }
 
-                for (let p of particles) {
-                    ctx.fillStyle = p.color;
-                    ctx.fillRect(p.x, p.y, p.size, p.size);
-                }
-
+                for (let p of particles) { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); }
                 for (let vfx of vfxQueue) {
                     ctx.globalAlpha = vfx.life / (vfx.life > 20 ? 30 : 10);
                     if (vfx.type === 'shockwave') {
-                        const maxLife = 30;
-                        const currentRadius = vfx.radius + (vfx.maxRadius - vfx.radius) * (1 - vfx.life / maxLife);
-                        ctx.strokeStyle = vfx.color;
-                        ctx.lineWidth = 4;
-                        ctx.beginPath();
-                        ctx.arc(vfx.x, vfx.y, currentRadius, Math.PI, 0); 
-                        ctx.stroke();
+                        const maxLife = 30; const currentRadius = vfx.radius + (vfx.maxRadius - vfx.radius) * (1 - vfx.life / maxLife);
+                        ctx.strokeStyle = vfx.color; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(vfx.x, vfx.y, currentRadius, Math.PI, 0); ctx.stroke();
                     } else if (vfx.type === 'projectileTrail') {
-                        ctx.fillStyle = vfx.color;
-                        const maxLife = 20;
-                        const progress = 1 - vfx.life / maxLife;
-                        const currentX = vfx.x + (vfx.targetX - vfx.x) * progress;
-                        const currentY = vfx.y + (GROUND_Y_GLOBAL - riftGuardian.h / 2 - vfx.y) * progress;
-                        ctx.beginPath();
-                        ctx.arc(currentX, currentY, 10, 0, Math.PI * 2);
-                        ctx.fill();
+                        ctx.fillStyle = vfx.color; const maxLife = 20; const progress = 1 - vfx.life / maxLife;
+                        const currentX = vfx.x + (vfx.targetX - vfx.x) * progress; const currentY = vfx.y + (GROUND_Y - riftGuardian.h / 2 - vfx.y) * progress;
+                        ctx.beginPath(); ctx.arc(currentX, currentY, 10, 0, Math.PI * 2); ctx.fill();
                     } else if (vfx.type === 'impactFlash') {
-                         ctx.fillStyle = vfx.color;
-                         const size = 60 * (1 - vfx.life / 10);
-                         ctx.beginPath();
-                         ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2);
-                         ctx.fill();
+                         ctx.fillStyle = vfx.color; const size = 60 * (1 - vfx.life / 10);
+                         ctx.beginPath(); ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2); ctx.fill();
                     } else if (vfx.type === 'impactRing') {
-                         ctx.strokeStyle = vfx.color;
-                         ctx.lineWidth = 3;
-                         const size = vfx.size + (50 * (1 - vfx.life / 10));
-                         ctx.beginPath();
-                         ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2);
-                         ctx.stroke();
+                         ctx.strokeStyle = vfx.color; ctx.lineWidth = 3; const size = vfx.size + (50 * (1 - vfx.life / 10));
+                         ctx.beginPath(); ctx.arc(vfx.x, vfx.y, size, 0, Math.PI * 2); ctx.stroke();
                     } else if (vfx.type === 'zeroImpact') {
-                        const lifePct = vfx.life / 18;
-                        ctx.save();
-                        ctx.globalAlpha = 0.85 * lifePct;
-                        ctx.fillStyle = vfx.color;
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.restore();
-                        ctx.save();
-                        ctx.globalCompositeOperation = 'lighter';
-                        const centerAlpha = 1 - lifePct;
-                        ctx.globalAlpha = centerAlpha * 0.9;
+                        const lifePct = vfx.life / 18; ctx.save(); ctx.globalAlpha = 0.85 * lifePct; ctx.fillStyle = vfx.color;
+                        ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.restore(); ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                        const centerAlpha = 1 - lifePct; ctx.globalAlpha = centerAlpha * 0.9;
                         const maxR = Math.max(canvas.width, canvas.height) * 0.35 * (vfx.intensity || 1);
-                        ctx.beginPath();
-                        ctx.fillStyle = "#ffffff";
-                        ctx.arc(canvas.width/2, canvas.height/2, maxR * (1 - lifePct*0.5), 0, Math.PI*2);
-                        ctx.fill();
-                        ctx.restore();
+                        ctx.beginPath(); ctx.fillStyle = "#ffffff"; ctx.arc(canvas.width/2, canvas.height/2, maxR * (1 - lifePct*0.5), 0, Math.PI*2); ctx.fill(); ctx.restore();
                     }
                 }
                 ctx.globalAlpha = 1;
 
-                ctx.font = "bold 18px Arial";
-                ctx.textAlign = "center";
+                ctx.font = "bold 18px Arial"; ctx.textAlign = "center";
                 for (let d of damageNumbers) {
-                    const alpha = d.life / 60;
-                    ctx.fillStyle = d.color;
-                    ctx.globalAlpha = alpha;
-                    ctx.strokeStyle = "#000000";
-                    ctx.lineWidth = 3;
-                    ctx.strokeText(d.text, d.x, d.y);
-                    ctx.fillText(d.text, d.x, d.y);
+                    const alpha = d.life / 60; ctx.fillStyle = d.color; ctx.globalAlpha = alpha; ctx.strokeStyle = "#000000"; ctx.lineWidth = 3;
+                    ctx.strokeText(d.text, d.x, d.y); ctx.fillText(d.text, d.x, d.y);
                 }
                 ctx.globalAlpha = 1;
-
                 ctx.restore();
                 
-                // Screen flash vfx
                 for (let i = vfxQueue.length - 1; i >= 0; i--) {
                     const vfx = vfxQueue[i];
                     if (vfx.type === 'fullFlash') {
-                        ctx.save();
-                        ctx.globalAlpha = vfx.life / 5;
-                        ctx.fillStyle = vfx.color;
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.restore();
+                        ctx.save(); ctx.globalAlpha = vfx.life / 5; ctx.fillStyle = vfx.color; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.restore();
                     }
                 }
 
                 // --- DRAW ZERO-POINT DIAMOND UI ---
                 if (zeroPoint.active || zeroPoint.charged) {
-                    const cx = canvas.width / 2;
-                    const cy = canvas.height / 2 - 80;
-                    const size = 36;
-                    const progress = Math.min(1, zeroPoint.timer / zeroPoint.duration);
-
+                    const cx = canvas.width / 2; const cy = canvas.height / 2 - 80; const size = 36; const progress = Math.min(1, zeroPoint.timer / zeroPoint.duration);
                     ctx.save();
                     const auraAlpha = zeroPoint.charged ? 0.9 : 0.25 + Math.sin(Date.now() * 0.03) * 0.12;
-                    ctx.globalAlpha = auraAlpha;
-                    ctx.fillStyle = '#8b0000';
-                    ctx.beginPath();
-                    ctx.ellipse(cx, cy, size * (1.0 + (zeroPoint.charged ? 0.3 : 0.1)), size * (1.0 + (zeroPoint.charged ? 0.3 : 0.1)), 0, 0, Math.PI*2);
-                    ctx.fill();
-                    ctx.globalAlpha = 1;
-
+                    ctx.globalAlpha = auraAlpha; ctx.fillStyle = '#8b0000'; ctx.beginPath();
+                    ctx.ellipse(cx, cy, size * (1.0 + (zeroPoint.charged ? 0.3 : 0.1)), size * (1.0 + (zeroPoint.charged ? 0.3 : 0.1)), 0, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
                     const diamondColor = zeroPoint.charged ? '#ff6666' : '#a60000';
-                    ctx.fillStyle = diamondColor;
-                    ctx.strokeStyle = '#000';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(cx, cy - size);
-                    ctx.lineTo(cx + size, cy);
-                    ctx.lineTo(cx, cy + size);
-                    ctx.lineTo(cx - size, cy);
-                    ctx.closePath();
-                    ctx.fill();
-                    ctx.stroke();
-
+                    ctx.fillStyle = diamondColor; ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath();
+                    ctx.moveTo(cx, cy - size); ctx.lineTo(cx + size, cy); ctx.lineTo(cx, cy + size); ctx.lineTo(cx - size, cy); ctx.closePath(); ctx.fill(); ctx.stroke();
                     const innerSize = size * (0.12 + 0.88 * progress);
                     ctx.fillStyle = zeroPoint.charged ? '#fff0f0' : '#330000';
-                    ctx.beginPath();
-                    ctx.moveTo(cx, cy - innerSize);
-                    ctx.lineTo(cx + innerSize, cy);
-                    ctx.lineTo(cx, cy + innerSize);
-                    ctx.lineTo(cx - innerSize, cy);
-                    ctx.closePath();
-                    ctx.fill();
-                    ctx.stroke();
-
-                    ctx.fillStyle = '#000';
-                    ctx.globalAlpha = 0.6;
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, 3, 0, Math.PI*2);
-                    ctx.fill();
-                    ctx.globalAlpha = 1;
-
-                    ctx.fillStyle = '#fff';
-                    ctx.font = zeroPoint.charged ? 'bold 12px Arial' : '12px Arial';
-                    ctx.textAlign = 'center';
-                    if (!zeroPoint.charged) {
-                        ctx.fillText('Charging...', cx, cy + size + 18);
-                    } else {
-                        ctx.fillText('Zero-Point Ready', cx, cy + size + 18);
-                    }
-
-                    ctx.restore();
-                    document.getElementById('zeroPointHint').style.display = 'block';
+                    ctx.beginPath(); ctx.moveTo(cx, cy - innerSize); ctx.lineTo(cx + innerSize, cy); ctx.lineTo(cx, cy + innerSize); ctx.lineTo(cx - innerSize, cy); ctx.closePath(); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#000'; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+                    ctx.fillStyle = '#fff'; ctx.font = zeroPoint.charged ? 'bold 12px Arial' : '12px Arial'; ctx.textAlign = 'center';
+                    if (!zeroPoint.charged) { ctx.fillText('Charging...', cx, cy + size + 18); } else { ctx.fillText('Zero-Point Ready', cx, cy + size + 18); }
+                    ctx.restore(); document.getElementById('zeroPointHint').style.display = 'block';
                 } else {
                     document.getElementById('zeroPointHint').style.display = 'none';
                 }
             }
 
-            function loop() {
-                update();
-                draw();
-                requestAnimationFrame(loop);
-            }
-
-            // ===== GAME START =====
+            function loop() { update(); draw(); requestAnimationFrame(loop); }
             startDialogue();
             loop();
         </script>
