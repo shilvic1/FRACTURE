@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Fracture - Game</title>
+        <title>Fracture - Act II: Memory Garden</title>
         <style>
             body {
                 margin: 0;
                 overflow: hidden;
-                background: #111;
+                background: #050510;
                 font-family: Arial, sans-serif;
             }
 
@@ -20,7 +20,7 @@
                 bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 120px;
+                height: 140px;
                 background: linear-gradient(0deg, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.7));
                 color: #fff;
                 padding: 15px 30px;
@@ -73,10 +73,39 @@
                 font-size: 16px;
             }
 
+            /* --- Choice Overlay --- */
+            #choiceOverlay {
+                position: fixed;
+                top: 30%;
+                left: 50%;
+                transform: translateX(-50%);
+                text-align: center;
+                color: white;
+                text-shadow: 0 0 10px #000;
+                z-index: 110;
+                display: none;
+                background: rgba(0,0,0,0.8);
+                padding: 20px;
+                border: 1px solid #fff;
+            }
+            .choiceOption {
+                margin: 10px 0;
+                font-size: 18px;
+            }
+            .keyChoice {
+                display: inline-block;
+                background: #fff;
+                color: #000;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-weight: bold;
+                margin-right: 10px;
+            }
+
             /* --- Tutorial Bar --- */
             #tutorialBar {
                 position: fixed;
-                bottom: 140px;
+                bottom: 160px;
                 left: 50%;
                 transform: translateX(-50%);
                 width: 70%;
@@ -444,10 +473,17 @@
         <div id="lowHpOverlay"></div>
         <div id="zeroPointHint">Press R to unleash Zero-Point Impact</div>
         
-        <div id="interactHint"><span class="keyPrompt">E</span> Enter Portal</div>
+        <div id="interactHint"><span class="keyPrompt">E</span> Interact</div>
         <div id="itemNotification">
             <div id="itemTitle">Memory Shard Acquired</div>
             <div id="itemDesc">A fragment of a forgotten past.</div>
+        </div>
+        
+        <div id="choiceOverlay">
+            <h2>The Mirror Echo</h2>
+            <p>A trapped soul resides within the glass.</p>
+            <div class="choiceOption"><span class="keyChoice">E</span> Save the Echo (Ally Buff, Low Corruption)</div>
+            <div class="choiceOption"><span class="keyChoice">R</span> Shatter the Mirror (Massive XP, High Corruption)</div>
         </div>
 
         <div id="mainHud">
@@ -472,7 +508,7 @@
         </div>
         
         <div id="npcHpBar">
-            <div id="npcHpBarTitle">Rift Guardian</div>
+            <div id="npcHpBarTitle">Enemy</div>
             <div id="npcHpBarInner"></div>
         </div>
 
@@ -547,7 +583,7 @@
 
         <script>
             // ===== GAME STATE & CORE SETUP =====
-            let gameState = 'dialogue'; // 'dialogue', 'combat', 'post-combat', 'scene2'
+            let gameState = 'dialogue'; // 'dialogue', 'combat', 'post-combat', 'scene2', 'scene3', 'choice'
             const canvas = document.getElementById("gameCanvas");
             const ctx = canvas.getContext("2d");
             canvas.width = innerWidth;
@@ -594,6 +630,7 @@
                     energy: 100,
                     reflectDamage: 0
                 },
+                corruption: 0, // NEW: Moral tracking
                 onGround: false,
                 wasOnGround: false,
                 isSprinting: false,
@@ -620,6 +657,33 @@
                 w: 35,
                 h: 60,
                 active: false
+            };
+            
+            // Scene 3 Objects
+            const platforms = []; // Array of {x, y, w, h}
+            const memoryOrbs = []; // Array of {x, y, collected}
+            let orbCount = 0;
+            const mirrorBoss = {
+                active: false,
+                x: 0,
+                y: 0,
+                w: 40,
+                h: 60,
+                hp: 800,
+                maxHp: 800,
+                velX: 0,
+                velY: 0,
+                attackCooldown: 0,
+                dashCooldown: 0,
+                phase: 'chase',
+                hitFlashTimer: 0
+            };
+            const choiceMirror = {
+                active: false,
+                x: 0,
+                y: 0,
+                w: 60,
+                h: 100
             };
 
             // ===== COMBAT METRICS =====
@@ -693,18 +757,25 @@
                     advanceDialogue();
                     return;
                 }
+                
+                // Interaction Logic
                 if (gameState === 'post-combat' && door.active && k === 'e') {
                     if (Math.abs((player.x + player.w/2) - (door.x + door.w/2)) < 60) {
                         enterRiftopia();
                     }
                 }
+                if (gameState === 'choice' && choiceMirror.active) {
+                    if (k === 'e') makeChoice('save');
+                    if (k === 'r') makeChoice('shatter');
+                }
+                
                 keys[k] = true;
             });
             document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
             
             let mouseDown = false;
             canvas.addEventListener("mousedown", (e) => {
-                if (e.button === 0 && (gameState === 'combat' || gameState === 'post-combat')) mouseDown = true;
+                if (e.button === 0 && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3')) mouseDown = true;
             });
             canvas.addEventListener("mouseup", (e) => {
                 if (e.button === 0) mouseDown = false;
@@ -712,7 +783,7 @@
 
             let menuOpen = false;
             document.addEventListener("keydown", (e) => {
-                if (gameState !== 'combat' && gameState !== 'post-combat') return; 
+                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3') return; 
                 if (e.key.toLowerCase() === "c") {
                     menuOpen = !menuOpen;
                     document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
@@ -830,10 +901,21 @@
                 const finalDamage = base * multiplier;
                 const dist = Math.abs((player.x + player.w/2) - (riftGuardian.x + riftGuardian.w/2));
                 const range = 600;
-                if (riftGuardian.alive && dist < range) {
+                
+                // Damage Guardian
+                if (gameState === 'combat' && riftGuardian.alive && dist < range) {
                     const knockback = 30 * multiplier;
                     dealDamageToGuardian(finalDamage, true, knockback);
                 }
+                
+                // Damage Mirror Boss
+                if (gameState === 'scene3' && mirrorBoss.active) {
+                     const distBoss = Math.abs((player.x + player.w/2) - (mirrorBoss.x + mirrorBoss.w/2));
+                     if(distBoss < range) {
+                         dealDamageToMirrorBoss(finalDamage, true, 30 * multiplier);
+                     }
+                }
+
                 vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: multiplier });
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ffffff", Math.max(20, 40 * multiplier), 18 * multiplier);
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff0000", Math.max(12, 30 * multiplier), 16 * multiplier);
@@ -848,7 +930,11 @@
             }
 
             function getNPCBox() { 
-                return { x: riftGuardian.x, y: riftGuardian.isAirborne ? riftGuardian.y : GROUND_Y - riftGuardian.h, w: riftGuardian.w, h: riftGuardian.h };
+                if (gameState === 'combat')
+                    return { x: riftGuardian.x, y: riftGuardian.isAirborne ? riftGuardian.y : GROUND_Y - riftGuardian.h, w: riftGuardian.w, h: riftGuardian.h };
+                if (gameState === 'scene3' && mirrorBoss.active)
+                    return { x: mirrorBoss.x, y: mirrorBoss.y, w: mirrorBoss.w, h: mirrorBoss.h };
+                return {x: -1000, y: -1000, w: 0, h:0};
             }
 
             function getAttackBox(customWidth) {
@@ -891,10 +977,11 @@
 
                     createDamageNumber(finalDmg, guardianBox.x + guardianBox.w / 2, guardianBox.y, dmgColor);
                     document.getElementById("npcHpBar").style.display = "block";
+                    document.getElementById("npcHpBarTitle").innerText = "Rift Guardian";
                     
                     if (riftGuardian.hp <= 0 && riftGuardian.alive) {
                         riftGuardian.alive = false;
-                        activatePostBossPhase(); // CHANGED: Trigger post-boss phase
+                        activatePostBossPhase(); 
                     }
                     
                     if (currentTutorialStep === 0 && finalDmg > 0) nextTutorialStep();
@@ -902,13 +989,40 @@
                     if (currentTutorialStep === 2 && zeroPoint.charged) nextTutorialStep();
                 }
             }
+            
+            // New Damage Logic for Mirror Boss
+            function dealDamageToMirrorBoss(amount, isAbility=false, knockbackForce=0) {
+                 if (!mirrorBoss.active) return;
+                 let bossBox = getNPCBox();
+                 let hitbox = getAttackBox();
+                 if (rectCollide(hitbox, bossBox)) {
+                     mirrorBoss.hp -= amount;
+                     let dir = (player.x < mirrorBoss.x) ? 1 : -1;
+                     mirrorBoss.velX = dir * knockbackForce;
+                     mirrorBoss.hitFlashTimer = 6;
+                     directionalBurst(bossBox.x+bossBox.w/2, bossBox.y+bossBox.h/2, "#9900ff", 10, dir);
+                     createDamageNumber(Math.floor(amount), bossBox.x+bossBox.w/2, bossBox.y, "#cc88ff");
+                     
+                     if (mirrorBoss.hp <= 0) {
+                         mirrorBoss.active = false;
+                         triggerFullFlash("#fff", 10);
+                         choiceMirror.active = true;
+                         choiceMirror.x = mirrorBoss.x;
+                         choiceMirror.y = mirrorBoss.y;
+                         gameState = 'choice';
+                         document.getElementById('npcHpBar').style.display = 'none';
+                         document.getElementById('choiceOverlay').style.display = 'block';
+                         document.getElementById('questTracker').style.display = 'none';
+                         updateQuest("Decide Fate", "Save or Shatter?");
+                     }
+                 }
+            }
 
             function activatePostBossPhase() {
                 gameState = 'post-combat';
                 document.getElementById('npcHpBar').style.display = 'none';
                 document.getElementById('questTracker').style.display = 'block';
                 
-                // Big Explosion where boss was
                 triggerFullFlash("#ffaa00", 10);
                 burstParticles(riftGuardian.x + riftGuardian.w/2, riftGuardian.y + riftGuardian.h/2, "#ffaa00", 100, 25);
                 triggerScreenShake(30, 20);
@@ -929,7 +1043,14 @@
             function dealDamageToPlayer(amount) {
                 if (player.invincible) return;
                 let incomingDmg = amount;
-                let guardianDir = (player.x + player.w/2 < riftGuardian.x + riftGuardian.w/2) ? 1 : -1; 
+                
+                // Determine direction based on enemy type
+                let sourceX = 0;
+                if (gameState === 'combat') sourceX = riftGuardian.x;
+                else if (gameState === 'scene3') sourceX = mirrorBoss.x;
+                
+                let guardianDir = (player.x + player.w/2 < sourceX) ? 1 : -1; 
+                
                 if (player.isBlocking) {
                     incomingDmg *= 0.1;
                     createDamageNumber("Block!", player.x + player.w / 2, player.y - 10, "#888");
@@ -941,11 +1062,15 @@
                 }
                 incomingDmg = incomingDmg - player.stats.defense;
                 if (incomingDmg < 1) incomingDmg = 1;
+                
+                // Reflect Logic
                 if (player.stats.reflectDamage > 0) {
                     let reflectedDmg = incomingDmg * player.stats.reflectDamage;
-                    dealDamageToGuardian(reflectedDmg, true, 2); 
-                    createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", riftGuardian.x + riftGuardian.w / 2, riftGuardian.y - 10, "#00ff00");
+                    if(gameState==='combat') dealDamageToGuardian(reflectedDmg, true, 2); 
+                    if(gameState==='scene3') dealDamageToMirrorBoss(reflectedDmg, true, 2);
+                    createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", sourceX, GROUND_Y - 40, "#00ff00");
                 }
+                
                 player.hp -= incomingDmg;
                 if (player.hp < 0) player.hp = 0;
                 if (!player.isBlocking) {
@@ -971,7 +1096,36 @@
                     riftGuardian.velX = guardianDir * 2;
                 }
             }
-            setInterval(guardianAI, 16); 
+            setInterval(guardianAI, 16);
+            
+            // Mirror Boss AI
+            function mirrorAI() {
+                if (gameState !== 'scene3' || !mirrorBoss.active) return;
+                
+                const dist = player.x - mirrorBoss.x;
+                const absDist = Math.abs(dist);
+                const dir = Math.sign(dist);
+                
+                // Dash mimic logic
+                if (player.isDashing && mirrorBoss.dashCooldown <= 0) {
+                     mirrorBoss.velX = dir * 20;
+                     mirrorBoss.dashCooldown = 60;
+                     createAfterimage(mirrorBoss.x, mirrorBoss.y, mirrorBoss.w, mirrorBoss.h, "#9900ff55");
+                } else {
+                    if (absDist > 60) mirrorBoss.velX = dir * (player.stats.speed + 1);
+                    else mirrorBoss.velX = 0;
+                }
+                
+                if (mirrorBoss.dashCooldown > 0) mirrorBoss.dashCooldown--;
+                if (mirrorBoss.attackCooldown > 0) mirrorBoss.attackCooldown--;
+                
+                // Attack logic
+                if (absDist < 80 && mirrorBoss.attackCooldown <= 0) {
+                    dealDamageToPlayer(15 + player.level * 2);
+                    mirrorBoss.attackCooldown = 45; // Fast attacks
+                    burstParticles(mirrorBoss.x + mirrorBoss.w/2, mirrorBoss.y + mirrorBoss.h/2, "#9900ff", 10, dir);
+                }
+            }
 
             function universalPunch() {
                 if (player.attackCooldown <= 0) {
@@ -979,7 +1133,7 @@
                     player.attackCooldown = 20;
                     let damage = player.stats.strength * 1.5; 
                     let moveType = 'Punch';
-                    const onGround = player.y + player.h >= GROUND_Y;
+                    const onGround = player.onGround;
                     let knockback = 4;
                     if (!onGround) {
                         if (player.velY < 0) {
@@ -999,32 +1153,22 @@
                         if (currentTutorialStep === 2) nextTutorialStep();
                         zeroPoint.charged = false; zeroPoint.active = false; zeroPoint.timer = 0; zeroPoint.cooldown = zeroPoint.cooldownMax;
                     }
-                    dealDamageToGuardian(damage, false, knockback);
-                    let guardianBox = getNPCBox();
+                    
+                    // Route Damage
+                    if (gameState === 'combat') dealDamageToGuardian(damage, false, knockback);
+                    else if (gameState === 'scene3') dealDamageToMirrorBoss(damage, false, knockback);
+                    
+                    // Hit Confirmation Logic for VFX (Simplified)
+                    let targetBox = getNPCBox();
                     let hitbox = getAttackBox();
-                    if (rectCollide(hitbox, guardianBox) && riftGuardian.alive) {
-                        if (moveType === 'Uppercut') {
-                            vfxQueue.push({ type: 'shockwave', x: riftGuardian.x + riftGuardian.w / 2, y: riftGuardian.y + riftGuardian.h / 2, color: "#ffffff", life: 15, radius: 10, maxRadius: 150 });
-                            burstParticles(riftGuardian.x + riftGuardian.w / 2, riftGuardian.y + riftGuardian.h / 2, "#fff", 80, 15);
-                            triggerScreenShake(15, 8);
-                            riftGuardian.isAirborne = true;
-                            riftGuardian.airborneVelY = -25;
-                            riftGuardian.airborneLife = 30;
-                            riftGuardian.velX = 0;
+                    if (rectCollide(hitbox, targetBox)) {
+                         if (moveType === 'Uppercut') {
                             player.velY = -15; 
                             player.jumpCount = player.maxJumps; 
                         } else if (moveType === 'Downslam') {
-                            vfxQueue.push({ type: 'shockwave', x: riftGuardian.x + riftGuardian.w / 2, y: GROUND_Y, color: "#ff0000", life: 30, radius: 20, maxRadius: 800 });
-                            burstParticles(riftGuardian.x + riftGuardian.w / 2, riftGuardian.y + riftGuardian.h / 2, "#ff0000", 120, 20);
-                            triggerScreenShake(30, 20);
-                            riftGuardian.isAirborne = false; 
-                            riftGuardian.airborneLife = 0;
-                            riftGuardian.y = GROUND_Y - riftGuardian.h;
-                            riftGuardian.velX = 0;
-                            vfxQueue.push({ type: 'impactFlash', x: riftGuardian.x + riftGuardian.w / 2, y: GROUND_Y, color: "#ffaa00", life: 10 });
+                            vfxQueue.push({ type: 'impactFlash', x: player.x, y: GROUND_Y, color: "#ffaa00", life: 10 });
                             player.velY = 0;
                             player.y = GROUND_Y - player.h;
-                            player.jumpCount = 0;
                         }
                     }
                 }
@@ -1048,22 +1192,22 @@
             function speed_ability1() { } 
             function speed_ability2() { if (abilityCooldowns[1] > 0) return; abilityCooldowns[1] = 90; player.jumpCount = 0; player.velY = -12; burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3); }
             function speed_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 20) return; player.energy -= 20; abilityCooldowns[2] = 180; player.invincible = true; triggerScreenShake(15, 10); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 50, 15); setTimeout(()=>player.invincible=false,1000); }
-            function strength_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 30) return; player.energy -= 30; abilityCooldowns[0] = 90; let dmg = player.stats.strength * 2.5; dealDamageToGuardian(dmg, true, 20); burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12); vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500}); triggerScreenShake(20,15); }
-            function strength_ability2() { if (abilityCooldowns[1] > 0 || player.stamina < 40) return; player.stamina -= 40; abilityCooldowns[1] = 60; let hits = 4; let dmgPerHit = player.stats.strength * 0.7; for (let i=0;i<hits;i++) setTimeout(()=>{dealDamageToGuardian(dmgPerHit,true,3); createAfterimage(player.x+player.w,player.y,10,player.h,"#ff880055");}, i*100); }
+            function strength_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 30) return; player.energy -= 30; abilityCooldowns[0] = 90; let dmg = player.stats.strength * 2.5; dealDamageToGuardian(dmg, true, 20); dealDamageToMirrorBoss(dmg, true, 20); burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12); vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500}); triggerScreenShake(20,15); }
+            function strength_ability2() { if (abilityCooldowns[1] > 0 || player.stamina < 40) return; player.stamina -= 40; abilityCooldowns[1] = 60; let hits = 4; let dmgPerHit = player.stats.strength * 0.7; for (let i=0;i<hits;i++) setTimeout(()=>{dealDamageToGuardian(dmgPerHit,true,3); dealDamageToMirrorBoss(dmgPerHit,true,3); createAfterimage(player.x+player.w,player.y,10,player.h,"#ff880055");}, i*100); }
             function strength_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 50) return; player.energy -= 50; abilityCooldowns[2] = 240; player.berserkMode = true; player.stats.defense = -5; burstParticles(player.x+player.w/2,player.y+player.h/2,"#ff5555",80,20); triggerScreenShake(25,18); setTimeout(()=>{player.berserkMode=false; player.stats.defense = buildStats[savedBuild].def; burstParticles(player.x+player.w/2,player.y+player.h/2,"#55ff55",50,12);},4000); }
             function defense_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[0] = 120; player.stats.defense += 10; burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#0000ff", 30, 8); setTimeout(()=>player.stats.defense -= 10,2000); }
             function defense_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 20) return; player.energy -= 20; abilityCooldowns[1] = 180; let heal = player.maxHp * 0.15; player.hp = Math.min(player.maxHp, player.hp + heal); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ff00", 40, 10); createDamageNumber(heal.toFixed(0) + " Heal", player.x + player.w / 2, player.y - 20, "#00ff00"); }
             function defense_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 10) return; player.energy -= 10; abilityCooldowns[2] = 180; player.stats.reflectDamage = 0.5; burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#8888ff", 25, 6); setTimeout(()=>player.stats.reflectDamage = 0.3,3000); }
-            function energy_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 25) return; player.energy -= 25; abilityCooldowns[0] = 90; let dmg = player.stats.energy * 0.8; dealDamageToGuardian(dmg, true, 10); vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: riftGuardian.x, targetY: riftGuardian.y, color: "#ff6600", life: 20 }); burstParticles(riftGuardian.x, riftGuardian.y + riftGuardian.h / 2, "#ff6600", 40, 10); }
-            function energy_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 40) return; player.energy -= 40; abilityCooldowns[1] = 150; let dmg = player.stats.energy * 1.5; dealDamageToGuardian(dmg, true, 25); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); triggerScreenShake(20,12); }
+            function energy_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 25) return; player.energy -= 25; abilityCooldowns[0] = 90; let dmg = player.stats.energy * 0.8; dealDamageToGuardian(dmg, true, 10); dealDamageToMirrorBoss(dmg, true, 10); vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: riftGuardian.x, targetY: riftGuardian.y, color: "#ff6600", life: 20 }); burstParticles(riftGuardian.x, riftGuardian.y + riftGuardian.h / 2, "#ff6600", 40, 10); }
+            function energy_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 40) return; player.energy -= 40; abilityCooldowns[1] = 150; let dmg = player.stats.energy * 1.5; dealDamageToGuardian(dmg, true, 25); dealDamageToMirrorBoss(dmg, true, 25); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); triggerScreenShake(20,12); }
             function energy_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[2] = 60; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); player.x += player.facing * 150; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); }
 
-            function ability1() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat')) return; if (savedBuild === 'Strength') strength_ability1(); else if (savedBuild === 'Defense') defense_ability1(); else if (savedBuild === 'Energy') energy_ability1(); }
-            function ability2() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat')) return; if (savedBuild === 'Speed') speed_ability2(); else if (savedBuild === 'Strength') strength_ability2(); else if (savedBuild === 'Defense') defense_ability2(); else if (savedBuild === 'Energy') energy_ability2(); }
-            function ability3() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat')) return; if (savedBuild === 'Speed') speed_ability3(); else if (savedBuild === 'Strength') strength_ability3(); else if (savedBuild === 'Defense') defense_ability3(); else if (savedBuild === 'Energy') energy_ability3(); }
+            function ability1() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3')) return; if (savedBuild === 'Strength') strength_ability1(); else if (savedBuild === 'Defense') defense_ability1(); else if (savedBuild === 'Energy') energy_ability1(); }
+            function ability2() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3')) return; if (savedBuild === 'Speed') speed_ability2(); else if (savedBuild === 'Strength') strength_ability2(); else if (savedBuild === 'Defense') defense_ability2(); else if (savedBuild === 'Energy') energy_ability2(); }
+            function ability3() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3')) return; if (savedBuild === 'Speed') speed_ability3(); else if (savedBuild === 'Strength') strength_ability3(); else if (savedBuild === 'Defense') defense_ability3(); else if (savedBuild === 'Energy') energy_ability3(); }
 
             document.addEventListener("keydown", (e) => {
-                if (gameState !== 'combat' && gameState !== 'post-combat') return;
+                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3') return;
                 if (e.key === "1") ability1();
                 if (e.key === "2") ability2();
                 if (e.key === "3") ability3();
@@ -1081,7 +1225,7 @@
 
             canvas.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                if (zeroPoint.cooldown > 0 || menuOpen || (gameState !== 'combat' && gameState !== 'post-combat')) return;
+                if (zeroPoint.cooldown > 0 || menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3')) return;
                 startZeroPointCharge();
             });
 
@@ -1122,7 +1266,19 @@
                 { speaker: "Mira", text: "I sense... a piece of the Source code within you. That Memory Shard you hold. It belongs to you." },
                 { speaker: "Mira", text: "Be careful. The Warden knows you are here." },
                 { speaker: "???", text: "The Warden... I know that name. It feels... cold. Hateful." },
-                { speaker: "Mira", text: "He is the architect of this fracture. And he does not tolerate anomalies like us." },
+                { speaker: "Mira", text: "He is the architect of this fracture. And he does not tolerate anomalies like us. Go, find the Memory Garden." },
+            ];
+            
+            const scene3Start = [
+                { speaker: "System", text: "Entering Sector: Memory Garden." },
+                { speaker: "???", text: "It's quiet here. Too quiet. Just floating islands and... are those mirrors?" },
+                { speaker: "Whisper", text: "Find the fragments... remember the promise." },
+            ];
+            
+            const scene3Memory = [
+                { speaker: "Memory", text: "'I promise I'll come back. I won't let the system crash. Not while you're still inside.'" },
+                { speaker: "???", text: "That voice... it was mine. Who was I talking to?" },
+                { speaker: "Dark Reflection", text: "It doesn't matter. You failed them anyway." },
             ];
 
             let currentMonologueIndex = 0;
@@ -1130,6 +1286,12 @@
             let typingTimer = null;
 
             function startDialogue(dialogueSet = monologueLines) {
+                // If switching to dialogue from gameplay, hide combat UI
+                if(gameState !== 'dialogue') {
+                    document.getElementById('questTracker').style.display = 'none';
+                    document.getElementById('combatInfo').style.display = 'none';
+                }
+                
                 gameState = 'dialogue';
                 currentDialogueArray = dialogueSet;
                 currentMonologueIndex = 0;
@@ -1174,7 +1336,15 @@
                     if (currentDialogueArray === monologueLines) {
                         startCombat();
                     } else if (currentDialogueArray === scene2Dialogue) {
-                        gameState = 'scene2'; // Or 'roam' logic for Scene 2
+                        initScene3(); // TRANSITION TO ACT II SCENE 3
+                    } else if (currentDialogueArray === scene3Start) {
+                        gameState = 'scene3';
+                        document.getElementById('combatInfo').style.display = 'flex';
+                        document.getElementById('questTracker').style.display = 'block';
+                        updateQuest("Fragmented Memories", "Collect 3 Memory Orbs.");
+                    } else if (currentDialogueArray === scene3Memory) {
+                        gameState = 'scene3';
+                        spawnMirrorBoss();
                     }
                 }
             }
@@ -1214,6 +1384,59 @@
                 setTimeout(() => {
                     startDialogue(scene2Dialogue);
                 }, 1000);
+            }
+            
+            function initScene3() {
+                gameState = 'scene3';
+                player.x = 100;
+                camX = 0;
+                mira.active = false;
+                
+                // Generate Platforms
+                platforms.length = 0;
+                platforms.push({x: 300, y: GROUND_Y - 100, w: 100, h: 20});
+                platforms.push({x: 500, y: GROUND_Y - 200, w: 100, h: 20});
+                platforms.push({x: 750, y: GROUND_Y - 150, w: 150, h: 20});
+                
+                // Generate Memory Orbs
+                memoryOrbs.length = 0;
+                memoryOrbs.push({x: 340, y: GROUND_Y - 140, collected: false});
+                memoryOrbs.push({x: 540, y: GROUND_Y - 240, collected: false});
+                memoryOrbs.push({x: 820, y: GROUND_Y - 190, collected: false});
+                
+                document.getElementById('abilityBar').style.display = 'flex';
+                document.getElementById('combatInfo').style.display = 'flex';
+                startDialogue(scene3Start);
+            }
+            
+            function spawnMirrorBoss() {
+                updateQuest("Confront Yourself", "Defeat the Dark Reflection.");
+                mirrorBoss.active = true;
+                mirrorBoss.x = 800;
+                mirrorBoss.y = GROUND_Y - mirrorBoss.h;
+                mirrorBoss.hp = mirrorBoss.maxHp;
+                document.getElementById('npcHpBar').style.display = 'block';
+                document.getElementById('npcHpBarTitle').innerText = "Dark Reflection";
+            }
+            
+            function makeChoice(type) {
+                if (type === 'save') {
+                    player.corruption--;
+                    createDamageNumber("Corruption Decreased", player.x, player.y - 50, "#00ffff");
+                    player.maxHp += 20; player.hp = player.maxHp; // Buff
+                    const notif = document.getElementById('itemNotification');
+                    notif.querySelector('#itemTitle').innerText = "Echo Saved";
+                    notif.querySelector('#itemDesc').innerText = "You showed mercy. Max HP increased.";
+                    notif.style.transform = "translate(-50%, -50%) scale(1)";
+                    setTimeout(() => { notif.style.transform = "translate(-50%, -50%) scale(0)"; }, 4000);
+                } else {
+                    player.corruption++;
+                    gainXP(500);
+                    createDamageNumber("Corruption Increased", player.x, player.y - 50, "#ff0000");
+                }
+                document.getElementById('choiceOverlay').style.display = 'none';
+                gameState = 'post-combat'; // Or transition to Act 3 in full game
+                updateQuest("Act II Complete", "The fracture deepens...");
             }
             
             function updateQuest(title, text) {
@@ -1275,7 +1498,7 @@
 
             // ===== UPDATE LOOP =====
             function update() {
-                if (menuOpen || gameState === 'dialogue') return;
+                if (menuOpen || gameState === 'dialogue' || gameState === 'choice') return;
 
                 // --- ZERO-POINT UPDATE ---
                 if (zeroPoint.cooldown > 0) zeroPoint.cooldown--;
@@ -1310,8 +1533,38 @@
                         }
                     }
                 }
+                
+                // Scene 3 AI
+                if (gameState === 'scene3') {
+                     // Check Orbs
+                     if (orbCount < 3) {
+                         memoryOrbs.forEach((orb, index) => {
+                             if(!orb.collected) {
+                                 // Simple dist check
+                                 const dx = (player.x + player.w/2) - orb.x;
+                                 const dy = (player.y + player.h/2) - orb.y;
+                                 if(Math.sqrt(dx*dx + dy*dy) < 40) {
+                                     orb.collected = true;
+                                     orbCount++;
+                                     burstParticles(orb.x, orb.y, "#00ffff", 20, 5);
+                                     if(orbCount === 3) startDialogue(scene3Memory);
+                                 }
+                             }
+                         });
+                     }
+                     
+                     if (mirrorBoss.active) {
+                         mirrorBoss.x += mirrorBoss.velX; mirrorBoss.velX *= 0.9;
+                         mirrorBoss.y += mirrorBoss.velY;
+                         if (mirrorBoss.hitFlashTimer > 0) mirrorBoss.hitFlashTimer--;
+                         // Simple bounds
+                         if (mirrorBoss.x < 100) mirrorBoss.x = 100;
+                         if (mirrorBoss.x > 1500) mirrorBoss.x = 1500;
+                         mirrorAI();
+                     }
+                }
 
-                // Player Physics (Applied in combat, post-combat, and scene2)
+                // Player Physics
                 player.wasOnGround = player.onGround;
                 const oldVelY = player.velY;
                 player.velY += 1.0;
@@ -1355,20 +1608,40 @@
                 player.x += player.velX;
                 player.y += player.velY;
                 
-                if (player.y + player.h >= GROUND_Y) {
+                // Ground Collision
+                let groundLevel = GROUND_Y;
+                
+                // Platform Collision (Scene 3)
+                if (gameState === 'scene3' && player.velY > 0) {
+                     platforms.forEach(p => {
+                         if (player.x + player.w > p.x && player.x < p.x + p.w &&
+                             player.y + player.h <= p.y + player.velY + 2 && player.y + player.h >= p.y - 5) {
+                                 groundLevel = p.y;
+                             }
+                     });
+                }
+                
+                if (player.y + player.h >= groundLevel) {
                     if (!player.wasOnGround && oldVelY > 5) {
-                        for(let i=0;i<16;i++) createDustParticle(player.x + player.w/2, GROUND_Y, 0);
+                        for(let i=0;i<16;i++) createDustParticle(player.x + player.w/2, groundLevel, 0);
                         triggerScreenShake(3, 2);
                     }
-                    player.y = GROUND_Y - player.h; player.velY = 0; player.jumpCount = 0; player.onGround = true;
+                    player.y = groundLevel - player.h; player.velY = 0; player.jumpCount = 0; player.onGround = true;
                 } else {
                     player.onGround = false;
                 }
                 
-                // Dash Hit Logic (Combat Only)
+                // Dash Hit Logic
                 if (gameState === 'combat' && player.isDashing && riftGuardian.alive && !player.hasDashHit) {
                     if (rectCollide({ x: player.x, y: player.y, w: player.w, h: player.h }, getNPCBox())) {
                         dealDamageToGuardian(player.stats.strength * 2.5, true, 12);
+                        player.velX = 0; player.isDashing = false; player.dashTime = 0; player.hasDashHit = true;
+                        player.attackTime = 10; triggerScreenShake(15, 8);
+                    }
+                }
+                if (gameState === 'scene3' && player.isDashing && mirrorBoss.active && !player.hasDashHit) {
+                    if (rectCollide({ x: player.x, y: player.y, w: player.w, h: player.h }, getNPCBox())) {
+                        dealDamageToMirrorBoss(player.stats.strength * 2.5, true, 12);
                         player.velX = 0; player.isDashing = false; player.dashTime = 0; player.hasDashHit = true;
                         player.attackTime = 10; triggerScreenShake(15, 8);
                     }
@@ -1378,7 +1651,7 @@
                 if (player.isDashing && player.dashTime <= 0) { player.isDashing = false; player.velX *= 0.8; }
                 if (player.dashCooldown > 0) player.dashCooldown--;
 
-                if (mouseDown && (gameState === 'combat' || gameState === 'post-combat')) universalPunch();
+                if (mouseDown && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3')) universalPunch();
                 if (player.attackTime > 0) player.attackTime--;
                 if (player.attackCooldown > 0) player.attackCooldown--;
 
@@ -1426,6 +1699,9 @@
                 
                 if (riftGuardian.alive && gameState === 'combat') {
                     document.getElementById("npcHpBarInner").style.width = (riftGuardian.hp / riftGuardian.maxHp * 100) + "%";
+                    document.getElementById("npcHpBar").style.display = "block";
+                } else if (mirrorBoss.active && gameState === 'scene3') {
+                    document.getElementById("npcHpBarInner").style.width = (mirrorBoss.hp / mirrorBoss.maxHp * 100) + "%";
                     document.getElementById("npcHpBar").style.display = "block";
                 } else {
                     document.getElementById("npcHpBar").style.display = "none";
@@ -1482,7 +1758,7 @@
                 ctx.translate(shakeOffsetX, shakeOffsetY);
                 
                 // BACKGROUND RENDERING
-                if (gameState === 'scene2') {
+                if (gameState === 'scene2' || gameState === 'scene3') {
                     // Riftopia Background (Purple/Teal theme)
                     ctx.fillStyle = "#110022"; 
                     let farX = (-camX * 0.1) % canvas.width;
@@ -1493,6 +1769,14 @@
                     let midX = (-camX * 0.3) % 500; 
                     for (let i = -3; i < canvas.width / 500 + 3; i++) {
                         ctx.fillRect(midX + i * 500, GROUND_Y - 180, 40, 180); // Tall pillars
+                    }
+                    
+                    if (gameState === 'scene3') {
+                         // Floating debris for memory garden
+                         ctx.fillStyle = "rgba(100, 200, 255, 0.1)";
+                         for(let i=0; i<20; i++) {
+                             ctx.fillRect((midX + i * 150) % canvas.width, (Date.now()/50 + i * 50) % (GROUND_Y/2), 20, 20);
+                         }
                     }
                 } else {
                     // Standard Battlefield Background
@@ -1518,7 +1802,49 @@
 
                 // Floor
                 ctx.fillStyle = gameState === 'scene2' ? "#330044" : "#222";
+                if(gameState === 'scene3') ctx.fillStyle = "rgba(20, 0, 40, 0.9)";
                 ctx.fillRect(camX - 1000, GROUND_Y, canvas.width + 2000, 80);
+                
+                // --- DRAW SCENE 3 ELEMENTS ---
+                if (gameState === 'scene3') {
+                    // Platforms
+                    ctx.fillStyle = "#442266";
+                    ctx.shadowBlur = 10; ctx.shadowColor = "#8800ff";
+                    platforms.forEach(p => {
+                        ctx.fillRect(p.x, p.y, p.w, p.h);
+                    });
+                    
+                    // Orbs
+                    memoryOrbs.forEach(orb => {
+                        if (!orb.collected) {
+                            ctx.fillStyle = "#00ffff";
+                            ctx.shadowColor = "#fff"; ctx.shadowBlur = 15;
+                            const bob = Math.sin(Date.now() / 200) * 5;
+                            ctx.beginPath();
+                            ctx.arc(orb.x, orb.y + bob, 8, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    });
+                    ctx.shadowBlur = 0;
+                    
+                    // Mirror Boss
+                    if (mirrorBoss.active) {
+                        ctx.fillStyle = mirrorBoss.hitFlashTimer > 0 ? "#fff" : "#220033";
+                        ctx.fillRect(mirrorBoss.x, mirrorBoss.y, mirrorBoss.w, mirrorBoss.h);
+                        // Glowing Eyes
+                        ctx.fillStyle = "#9900ff";
+                        ctx.fillRect(mirrorBoss.x + (player.x < mirrorBoss.x ? 5 : 25), mirrorBoss.y + 10, 5, 2);
+                    }
+                    
+                    // Choice Mirror
+                    if (choiceMirror.active) {
+                        ctx.fillStyle = "#55eeff";
+                        ctx.globalAlpha = 0.6;
+                        ctx.fillRect(choiceMirror.x, choiceMirror.y, choiceMirror.w, choiceMirror.h);
+                        ctx.strokeStyle = "#fff"; ctx.strokeRect(choiceMirror.x, choiceMirror.y, choiceMirror.w, choiceMirror.h);
+                        ctx.globalAlpha = 1;
+                    }
+                }
                 
                 // --- DRAW DOOR (Post-Combat) ---
                 if (gameState === 'post-combat' && door.active) {
@@ -1610,7 +1936,9 @@
                         ctx.strokeStyle = vfx.color; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(vfx.x, vfx.y, currentRadius, Math.PI, 0); ctx.stroke();
                     } else if (vfx.type === 'projectileTrail') {
                         ctx.fillStyle = vfx.color; const maxLife = 20; const progress = 1 - vfx.life / maxLife;
-                        const currentX = vfx.x + (vfx.targetX - vfx.x) * progress; const currentY = vfx.y + (GROUND_Y - riftGuardian.h / 2 - vfx.y) * progress;
+                        // Basic lerp logic, simplified for global vfx
+                        const currentX = vfx.x + (vfx.targetX - vfx.x) * progress; 
+                        const currentY = vfx.y + (GROUND_Y - 40 - vfx.y) * progress;
                         ctx.beginPath(); ctx.arc(currentX, currentY, 10, 0, Math.PI * 2); ctx.fill();
                     } else if (vfx.type === 'impactFlash') {
                          ctx.fillStyle = vfx.color; const size = 60 * (1 - vfx.life / 10);
