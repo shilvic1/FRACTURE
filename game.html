@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Fracture - Act II: Memory Garden</title>
+        <title>Fracture - Act II: Memory Garden & Iron Spine</title>
         <style>
             body {
                 margin: 0;
@@ -73,8 +73,8 @@
                 font-size: 16px;
             }
 
-            /* --- Choice Overlay --- */
-            #choiceOverlay {
+            /* --- Choice Overlay (Generic) --- */
+            .choiceOverlay {
                 position: fixed;
                 top: 30%;
                 left: 50%;
@@ -84,22 +84,33 @@
                 text-shadow: 0 0 10px #000;
                 z-index: 110;
                 display: none;
-                background: rgba(0,0,0,0.8);
-                padding: 20px;
-                border: 1px solid #fff;
+                background: rgba(0,0,0,0.9);
+                padding: 30px;
+                border: 2px solid #fff;
+                border-radius: 8px;
+                box-shadow: 0 0 50px rgba(0,0,0,0.8);
             }
             .choiceOption {
-                margin: 10px 0;
+                margin: 15px 0;
                 font-size: 18px;
+                cursor: pointer;
+                transition: color 0.2s;
             }
+            .choiceOption:hover { color: #0ff; }
             .keyChoice {
                 display: inline-block;
                 background: #fff;
                 color: #000;
-                padding: 2px 6px;
+                padding: 2px 8px;
                 border-radius: 4px;
                 font-weight: bold;
                 margin-right: 10px;
+            }
+            .skillCard {
+                border: 1px solid #555;
+                background: rgba(30,30,30,0.5);
+                padding: 10px;
+                margin: 10px 0;
             }
 
             /* --- Tutorial Bar --- */
@@ -479,11 +490,22 @@
             <div id="itemDesc">A fragment of a forgotten past.</div>
         </div>
         
-        <div id="choiceOverlay">
+        <div id="choiceOverlay" class="choiceOverlay">
             <h2>The Mirror Echo</h2>
             <p>A trapped soul resides within the glass.</p>
             <div class="choiceOption"><span class="keyChoice">E</span> Save the Echo (Ally Buff, Low Corruption)</div>
             <div class="choiceOption"><span class="keyChoice">R</span> Shatter the Mirror (Massive XP, High Corruption)</div>
+        </div>
+
+        <div id="skillOverlay" class="choiceOverlay">
+            <h2 style="color:#ffaa00">Core Node Intercepted</h2>
+            <p>The Fracturer's code is vulnerable here. Evolve your Zero-Point.</p>
+            <div class="skillCard">
+                <div class="choiceOption" onclick="makeSkillChoice('efficiency')"><span class="keyChoice">E</span> <b>System Efficiency</b><br><span style="font-size:14px; color:#aaa;">Cooldown -40%, Charge Time -50%. Reliable power.</span></div>
+            </div>
+            <div class="skillCard">
+                <div class="choiceOption" onclick="makeSkillChoice('power')"><span class="keyChoice">R</span> <b>Unstable Overclock</b><br><span style="font-size:14px; color:#aaa;">Damage x2.5, Radius x2. Dangerous recoil.</span></div>
+            </div>
         </div>
 
         <div id="mainHud">
@@ -583,7 +605,7 @@
 
         <script>
             // ===== GAME STATE & CORE SETUP =====
-            let gameState = 'dialogue'; // 'dialogue', 'combat', 'post-combat', 'scene2', 'scene3', 'choice'
+            let gameState = 'dialogue'; // 'dialogue', 'combat', 'post-combat', 'scene2', 'scene3', 'choice', 'scene4'
             const canvas = document.getElementById("gameCanvas");
             const ctx = canvas.getContext("2d");
             canvas.width = innerWidth;
@@ -630,7 +652,7 @@
                     energy: 100,
                     reflectDamage: 0
                 },
-                corruption: 0, // NEW: Moral tracking
+                corruption: 0, // Moral tracking
                 onGround: false,
                 wasOnGround: false,
                 isSprinting: false,
@@ -684,6 +706,29 @@
                 y: 0,
                 w: 60,
                 h: 100
+            };
+
+            // Scene 4 Objects (Iron Spine)
+            const wardenElite = {
+                active: false,
+                x: 0,
+                y: 0,
+                w: 80,
+                h: 100,
+                hp: 1500,
+                maxHp: 1500,
+                velX: 0,
+                velY: 0,
+                attackCooldown: 0,
+                smashCooldown: 0,
+                hitFlashTimer: 0
+            };
+            const skillNode = {
+                active: false,
+                x: 0,
+                y: 0,
+                w: 60,
+                h: 60
             };
 
             // ===== COMBAT METRICS =====
@@ -768,6 +813,18 @@
                     if (k === 'e') makeChoice('save');
                     if (k === 'r') makeChoice('shatter');
                 }
+                // Scene 4 Skill Node Interaction
+                if (gameState === 'scene4' && skillNode.active && k === 'e') {
+                    const dist = Math.abs((player.x + player.w/2) - (skillNode.x + skillNode.w/2));
+                    const distY = Math.abs((player.y + player.h/2) - (skillNode.y + skillNode.h/2));
+                    if(dist < 80 && distY < 80) {
+                        openSkillChoice();
+                    }
+                }
+                if (gameState === 'scene4' && document.getElementById('skillOverlay').style.display === 'block') {
+                    if (k === 'e') makeSkillChoice('efficiency');
+                    if (k === 'r') makeSkillChoice('power');
+                }
                 
                 keys[k] = true;
             });
@@ -775,7 +832,7 @@
             
             let mouseDown = false;
             canvas.addEventListener("mousedown", (e) => {
-                if (e.button === 0 && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3')) mouseDown = true;
+                if (e.button === 0 && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3' || gameState === 'scene4')) mouseDown = true;
             });
             canvas.addEventListener("mouseup", (e) => {
                 if (e.button === 0) mouseDown = false;
@@ -783,7 +840,7 @@
 
             let menuOpen = false;
             document.addEventListener("keydown", (e) => {
-                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3') return; 
+                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4') return; 
                 if (e.key.toLowerCase() === "c") {
                     menuOpen = !menuOpen;
                     document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
@@ -808,6 +865,7 @@
             const afterimages = []; 
             const vfxQueue = []; 
             let camX = 0;
+            let camY = 0; // Added Vertical Camera
             let abilityCooldowns = [0, 0, 0, 0];
             let screenShakeTime = 0;
             let shakeIntensity = 0;
@@ -818,7 +876,9 @@
                 duration: 120,
                 charged: false,
                 cooldown: 0,
-                cooldownMax: 300
+                cooldownMax: 300,
+                efficiencyMod: 1.0, // 0.5 if efficiently unlocked
+                powerMod: 1.0 // 2.0 if power unlocked
             };
 
             function triggerScreenShake(duration = 8, intensity = 6) { 
@@ -898,9 +958,10 @@
 
             function triggerZeroPointImpactFromMultiplier(multiplier) {
                 const base = player.stats.strength * 1.5;
-                const finalDamage = base * multiplier;
+                // Apply Power Mod if unlocked
+                const finalDamage = base * multiplier * zeroPoint.powerMod;
                 const dist = Math.abs((player.x + player.w/2) - (riftGuardian.x + riftGuardian.w/2));
-                const range = 600;
+                const range = 600 * zeroPoint.powerMod; // Larger range if Power mod
                 
                 // Damage Guardian
                 if (gameState === 'combat' && riftGuardian.alive && dist < range) {
@@ -915,13 +976,24 @@
                          dealDamageToMirrorBoss(finalDamage, true, 30 * multiplier);
                      }
                 }
+                
+                // Damage Warden Elite
+                if (gameState === 'scene4' && wardenElite.active) {
+                     const distWarden = Math.abs((player.x + player.w/2) - (wardenElite.x + wardenElite.w/2));
+                     const distY = Math.abs((player.y + player.h/2) - (wardenElite.y + wardenElite.h/2));
+                     if(distWarden < range && distY < range) {
+                         dealDamageToWarden(finalDamage, true, 30 * multiplier);
+                     }
+                }
 
                 vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: multiplier });
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ffffff", Math.max(20, 40 * multiplier), 18 * multiplier);
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff0000", Math.max(12, 30 * multiplier), 16 * multiplier);
                 triggerScreenShake(25, 16 * Math.min(multiplier / 2, 2.5));
                 setTimeout(() => { triggerFullFlash("#ffffff", 4); }, 40);
-                zeroPoint.cooldown = zeroPoint.cooldownMax;
+                
+                // Apply Efficiency Mod
+                zeroPoint.cooldown = zeroPoint.cooldownMax * zeroPoint.efficiencyMod;
             }
 
             // ===== COMBAT SYSTEM =====
@@ -934,6 +1006,8 @@
                     return { x: riftGuardian.x, y: riftGuardian.isAirborne ? riftGuardian.y : GROUND_Y - riftGuardian.h, w: riftGuardian.w, h: riftGuardian.h };
                 if (gameState === 'scene3' && mirrorBoss.active)
                     return { x: mirrorBoss.x, y: mirrorBoss.y, w: mirrorBoss.w, h: mirrorBoss.h };
+                if (gameState === 'scene4' && wardenElite.active)
+                    return { x: wardenElite.x, y: wardenElite.y, w: wardenElite.w, h: wardenElite.h };
                 return {x: -1000, y: -1000, w: 0, h:0};
             }
 
@@ -1017,6 +1091,30 @@
                      }
                  }
             }
+            
+            // Scene 4 Warden Damage Logic
+            function dealDamageToWarden(amount, isAbility=false, knockbackForce=0) {
+                if (!wardenElite.active) return;
+                let bossBox = getNPCBox();
+                let hitbox = getAttackBox();
+                if (rectCollide(hitbox, bossBox)) {
+                    wardenElite.hp -= amount;
+                    let dir = (player.x < wardenElite.x) ? 1 : -1;
+                    wardenElite.velX = dir * (knockbackForce * 0.5); // He's heavy
+                    wardenElite.hitFlashTimer = 6;
+                    directionalBurst(bossBox.x+bossBox.w/2, bossBox.y+bossBox.h/2, "#ffaa00", 12, dir);
+                    createDamageNumber(Math.floor(amount), bossBox.x+bossBox.w/2, bossBox.y, "#ffcc00");
+                    
+                    if (wardenElite.hp <= 0) {
+                        wardenElite.active = false;
+                        triggerScreenShake(40, 20);
+                        triggerFullFlash("#ffaa00", 20);
+                        gainXP(1000);
+                        updateQuest("Ascend", "Climb to the Core Node.");
+                        document.getElementById('npcHpBar').style.display = 'none';
+                    }
+                }
+            }
 
             function activatePostBossPhase() {
                 gameState = 'post-combat';
@@ -1048,6 +1146,7 @@
                 let sourceX = 0;
                 if (gameState === 'combat') sourceX = riftGuardian.x;
                 else if (gameState === 'scene3') sourceX = mirrorBoss.x;
+                else if (gameState === 'scene4') sourceX = wardenElite.x;
                 
                 let guardianDir = (player.x + player.w/2 < sourceX) ? 1 : -1; 
                 
@@ -1068,6 +1167,7 @@
                     let reflectedDmg = incomingDmg * player.stats.reflectDamage;
                     if(gameState==='combat') dealDamageToGuardian(reflectedDmg, true, 2); 
                     if(gameState==='scene3') dealDamageToMirrorBoss(reflectedDmg, true, 2);
+                    if(gameState==='scene4') dealDamageToWarden(reflectedDmg, true, 2);
                     createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", sourceX, GROUND_Y - 40, "#00ff00");
                 }
                 
@@ -1127,6 +1227,46 @@
                 }
             }
 
+            // Warden Elite AI (Scene 4)
+            function wardenAI() {
+                if (gameState !== 'scene4' || !wardenElite.active) return;
+                
+                const dist = player.x - wardenElite.x;
+                const absDist = Math.abs(dist);
+                const distY = Math.abs(player.y - wardenElite.y);
+                const dir = Math.sign(dist);
+
+                if (wardenElite.attackCooldown > 0) wardenElite.attackCooldown--;
+                if (wardenElite.smashCooldown > 0) wardenElite.smashCooldown--;
+
+                // Movement
+                if (absDist > 100) wardenElite.velX = dir * 1.5;
+                else wardenElite.velX = 0;
+
+                // Smash Attack (Area Effect)
+                if (wardenElite.smashCooldown <= 0 && absDist < 150 && distY < 100) {
+                    wardenElite.smashCooldown = 200;
+                    wardenElite.velY = -10; // Jump up
+                    setTimeout(() => {
+                        wardenElite.velY = 20; // Slam down
+                        setTimeout(() => {
+                            triggerScreenShake(20, 15);
+                            burstParticles(wardenElite.x + wardenElite.w/2, wardenElite.y + wardenElite.h, "#ff8800", 30, 10);
+                            if (player.onGround && Math.abs(player.x - wardenElite.x) < 300 && Math.abs(player.y - wardenElite.y) < 50) {
+                                dealDamageToPlayer(30);
+                                player.velY = -15; // Knock player up
+                            }
+                        }, 200);
+                    }, 500);
+                } 
+                // Basic Punch
+                else if (wardenElite.attackCooldown <= 0 && absDist < 80 && distY < 80) {
+                    dealDamageToPlayer(25);
+                    wardenElite.attackCooldown = 80;
+                    triggerScreenShake(5, 5);
+                }
+            }
+
             function universalPunch() {
                 if (player.attackCooldown <= 0) {
                     player.attackTime = 10;
@@ -1144,19 +1284,17 @@
                     }
                     if (zeroPoint.charged) {
                         const mul = 2.5 + Math.random() * 0.5;
-                        damage *= mul;
-                        knockback *= mul * 6;
-                        vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: mul });
-                        burstParticles(player.x + player.w/2, player.y + player.h/2, "#ffffff", Math.max(20, 40 * mul), 18 * mul);
-                        triggerScreenShake(30, 20 * mul);
-                        triggerFullFlash("#ffffff", 4);
+                        triggerZeroPointImpactFromMultiplier(mul);
+                        // Zero point triggers damage inside its helper function
                         if (currentTutorialStep === 2) nextTutorialStep();
-                        zeroPoint.charged = false; zeroPoint.active = false; zeroPoint.timer = 0; zeroPoint.cooldown = zeroPoint.cooldownMax;
+                        zeroPoint.charged = false; zeroPoint.active = false; zeroPoint.timer = 0; 
+                        zeroPoint.cooldown = zeroPoint.cooldownMax * zeroPoint.efficiencyMod;
+                    } else {
+                        // Standard punch damage routing
+                        if (gameState === 'combat') dealDamageToGuardian(damage, false, knockback);
+                        else if (gameState === 'scene3') dealDamageToMirrorBoss(damage, false, knockback);
+                        else if (gameState === 'scene4') dealDamageToWarden(damage, false, knockback);
                     }
-                    
-                    // Route Damage
-                    if (gameState === 'combat') dealDamageToGuardian(damage, false, knockback);
-                    else if (gameState === 'scene3') dealDamageToMirrorBoss(damage, false, knockback);
                     
                     // Hit Confirmation Logic for VFX (Simplified)
                     let targetBox = getNPCBox();
@@ -1166,9 +1304,8 @@
                             player.velY = -15; 
                             player.jumpCount = player.maxJumps; 
                         } else if (moveType === 'Downslam') {
-                            vfxQueue.push({ type: 'impactFlash', x: player.x, y: GROUND_Y, color: "#ffaa00", life: 10 });
-                            player.velY = 0;
-                            player.y = GROUND_Y - player.h;
+                            vfxQueue.push({ type: 'impactFlash', x: player.x, y: player.y + player.h, color: "#ffaa00", life: 10 });
+                            player.velY = -5; // Bounce slightly
                         }
                     }
                 }
@@ -1177,7 +1314,7 @@
             function dashMove() {
                 if (abilityCooldowns[3] > 0 || player.stamina < 30 || player.isDashing) return;
                 player.stamina -= 30;
-                abilityCooldowns[3] = 70;
+                abilityCooldowns[3] = 70 * zeroPoint.efficiencyMod; // Dashing benefits slightly from efficiency
                 player.dashTime = 15;
                 player.isDashing = true; 
                 player.hasDashHit = false;
@@ -1192,28 +1329,28 @@
             function speed_ability1() { } 
             function speed_ability2() { if (abilityCooldowns[1] > 0) return; abilityCooldowns[1] = 90; player.jumpCount = 0; player.velY = -12; burstParticles(player.x + 20, player.y + player.h, "#0ff", 10, 3); }
             function speed_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 20) return; player.energy -= 20; abilityCooldowns[2] = 180; player.invincible = true; triggerScreenShake(15, 10); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 50, 15); setTimeout(()=>player.invincible=false,1000); }
-            function strength_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 30) return; player.energy -= 30; abilityCooldowns[0] = 90; let dmg = player.stats.strength * 2.5; dealDamageToGuardian(dmg, true, 20); dealDamageToMirrorBoss(dmg, true, 20); burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12); vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: GROUND_Y, color: "#ff5500", life: 30, radius: 10, maxRadius: 500}); triggerScreenShake(20,15); }
-            function strength_ability2() { if (abilityCooldowns[1] > 0 || player.stamina < 40) return; player.stamina -= 40; abilityCooldowns[1] = 60; let hits = 4; let dmgPerHit = player.stats.strength * 0.7; for (let i=0;i<hits;i++) setTimeout(()=>{dealDamageToGuardian(dmgPerHit,true,3); dealDamageToMirrorBoss(dmgPerHit,true,3); createAfterimage(player.x+player.w,player.y,10,player.h,"#ff880055");}, i*100); }
+            function strength_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 30) return; player.energy -= 30; abilityCooldowns[0] = 90; let dmg = player.stats.strength * 2.5; dealDamageToGuardian(dmg, true, 20); dealDamageToMirrorBoss(dmg, true, 20); dealDamageToWarden(dmg, true, 10); burstParticles(player.x + player.w / 2, GROUND_Y, "#ff0000", 50, 12); vfxQueue.push({ type: 'shockwave', x: player.x + player.w / 2, y: player.y+player.h, color: "#ff5500", life: 30, radius: 10, maxRadius: 500}); triggerScreenShake(20,15); }
+            function strength_ability2() { if (abilityCooldowns[1] > 0 || player.stamina < 40) return; player.stamina -= 40; abilityCooldowns[1] = 60; let hits = 4; let dmgPerHit = player.stats.strength * 0.7; for (let i=0;i<hits;i++) setTimeout(()=>{dealDamageToGuardian(dmgPerHit,true,3); dealDamageToMirrorBoss(dmgPerHit,true,3); dealDamageToWarden(dmgPerHit,true,3); createAfterimage(player.x+player.w,player.y,10,player.h,"#ff880055");}, i*100); }
             function strength_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 50) return; player.energy -= 50; abilityCooldowns[2] = 240; player.berserkMode = true; player.stats.defense = -5; burstParticles(player.x+player.w/2,player.y+player.h/2,"#ff5555",80,20); triggerScreenShake(25,18); setTimeout(()=>{player.berserkMode=false; player.stats.defense = buildStats[savedBuild].def; burstParticles(player.x+player.w/2,player.y+player.h/2,"#55ff55",50,12);},4000); }
             function defense_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[0] = 120; player.stats.defense += 10; burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#0000ff", 30, 8); setTimeout(()=>player.stats.defense -= 10,2000); }
             function defense_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 20) return; player.energy -= 20; abilityCooldowns[1] = 180; let heal = player.maxHp * 0.15; player.hp = Math.min(player.maxHp, player.hp + heal); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ff00", 40, 10); createDamageNumber(heal.toFixed(0) + " Heal", player.x + player.w / 2, player.y - 20, "#00ff00"); }
             function defense_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 10) return; player.energy -= 10; abilityCooldowns[2] = 180; player.stats.reflectDamage = 0.5; burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#8888ff", 25, 6); setTimeout(()=>player.stats.reflectDamage = 0.3,3000); }
-            function energy_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 25) return; player.energy -= 25; abilityCooldowns[0] = 90; let dmg = player.stats.energy * 0.8; dealDamageToGuardian(dmg, true, 10); dealDamageToMirrorBoss(dmg, true, 10); vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: riftGuardian.x, targetY: riftGuardian.y, color: "#ff6600", life: 20 }); burstParticles(riftGuardian.x, riftGuardian.y + riftGuardian.h / 2, "#ff6600", 40, 10); }
-            function energy_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 40) return; player.energy -= 40; abilityCooldowns[1] = 150; let dmg = player.stats.energy * 1.5; dealDamageToGuardian(dmg, true, 25); dealDamageToMirrorBoss(dmg, true, 25); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); triggerScreenShake(20,12); }
+            function energy_ability1() { if (abilityCooldowns[0] > 0 || player.energy < 25) return; player.energy -= 25; abilityCooldowns[0] = 90; let dmg = player.stats.energy * 0.8; dealDamageToGuardian(dmg, true, 10); dealDamageToMirrorBoss(dmg, true, 10); dealDamageToWarden(dmg, true, 10); vfxQueue.push({ type: 'projectileTrail', x: player.x + player.w / 2, y: player.y + player.h / 2, targetX: riftGuardian.x, targetY: riftGuardian.y, color: "#ff6600", life: 20 }); burstParticles(riftGuardian.x, riftGuardian.y + riftGuardian.h / 2, "#ff6600", 40, 10); }
+            function energy_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 40) return; player.energy -= 40; abilityCooldowns[1] = 150; let dmg = player.stats.energy * 1.5; dealDamageToGuardian(dmg, true, 25); dealDamageToMirrorBoss(dmg, true, 25); dealDamageToWarden(dmg, true, 10); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); triggerScreenShake(20,12); }
             function energy_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[2] = 60; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); player.x += player.facing * 150; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); }
 
-            function ability1() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3')) return; if (savedBuild === 'Strength') strength_ability1(); else if (savedBuild === 'Defense') defense_ability1(); else if (savedBuild === 'Energy') energy_ability1(); }
-            function ability2() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3')) return; if (savedBuild === 'Speed') speed_ability2(); else if (savedBuild === 'Strength') strength_ability2(); else if (savedBuild === 'Defense') defense_ability2(); else if (savedBuild === 'Energy') energy_ability2(); }
-            function ability3() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3')) return; if (savedBuild === 'Speed') speed_ability3(); else if (savedBuild === 'Strength') strength_ability3(); else if (savedBuild === 'Defense') defense_ability3(); else if (savedBuild === 'Energy') energy_ability3(); }
+            function ability1() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4')) return; if (savedBuild === 'Strength') strength_ability1(); else if (savedBuild === 'Defense') defense_ability1(); else if (savedBuild === 'Energy') energy_ability1(); }
+            function ability2() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4')) return; if (savedBuild === 'Speed') speed_ability2(); else if (savedBuild === 'Strength') strength_ability2(); else if (savedBuild === 'Defense') defense_ability2(); else if (savedBuild === 'Energy') energy_ability2(); }
+            function ability3() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4')) return; if (savedBuild === 'Speed') speed_ability3(); else if (savedBuild === 'Strength') strength_ability3(); else if (savedBuild === 'Defense') defense_ability3(); else if (savedBuild === 'Energy') energy_ability3(); }
 
             document.addEventListener("keydown", (e) => {
-                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3') return;
+                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4') return;
                 if (e.key === "1") ability1();
                 if (e.key === "2") ability2();
                 if (e.key === "3") ability3();
                 if (e.key.toLowerCase() === 'r') {
                     if ((zeroPoint.active && !zeroPoint.charged) || zeroPoint.charged) {
-                        const progress = Math.min(1, zeroPoint.timer / zeroPoint.duration);
+                        const progress = Math.min(1, zeroPoint.timer / (zeroPoint.duration * zeroPoint.efficiencyMod));
                         const minMul = 2.5; const maxMul = 3.0;
                         const mul = 1 + (minMul - 1) * progress + Math.random() * ((maxMul - minMul) * progress);
                         triggerZeroPointImpactFromMultiplier(mul);
@@ -1225,7 +1362,7 @@
 
             canvas.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                if (zeroPoint.cooldown > 0 || menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3')) return;
+                if (zeroPoint.cooldown > 0 || menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4')) return;
                 startZeroPointCharge();
             });
 
@@ -1279,6 +1416,14 @@
                 { speaker: "Memory", text: "'I promise I'll come back. I won't let the system crash. Not while you're still inside.'" },
                 { speaker: "???", text: "That voice... it was mine. Who was I talking to?" },
                 { speaker: "Dark Reflection", text: "It doesn't matter. You failed them anyway." },
+            ];
+
+            const scene4Start = [
+                { speaker: "???", text: "The architecture is changing... rigid. Cold. Metal replaces the memories." },
+                { speaker: "Warden Elite", text: "ANOMALY DETECTED. YOU SEEK TO HEAL THE FRACTURE? YOU ARE THE DISEASE." },
+                { speaker: "???", text: "I'm not here to heal it. I'm here to understand why it was broken." },
+                { speaker: "Warden Elite", text: "THE FRACTURER BROKE THE WORLD TO SAVE IT FROM THE RESET. TO FREEZE US IN TIME." },
+                { speaker: "???", text: "A frozen world is a dead world. Move aside." }
             ];
 
             let currentMonologueIndex = 0;
@@ -1336,7 +1481,7 @@
                     if (currentDialogueArray === monologueLines) {
                         startCombat();
                     } else if (currentDialogueArray === scene2Dialogue) {
-                        initScene3(); // TRANSITION TO ACT II SCENE 3
+                        initScene3(); 
                     } else if (currentDialogueArray === scene3Start) {
                         gameState = 'scene3';
                         document.getElementById('combatInfo').style.display = 'flex';
@@ -1345,6 +1490,12 @@
                     } else if (currentDialogueArray === scene3Memory) {
                         gameState = 'scene3';
                         spawnMirrorBoss();
+                    } else if (currentDialogueArray === scene4Start) {
+                        gameState = 'scene4';
+                        document.getElementById('combatInfo').style.display = 'flex';
+                        document.getElementById('questTracker').style.display = 'block';
+                        updateQuest("Iron Gauntlet", "Climb the tower. Defeat the Warden Elite.");
+                        wardenElite.active = true;
                     }
                 }
             }
@@ -1408,6 +1559,42 @@
                 document.getElementById('combatInfo').style.display = 'flex';
                 startDialogue(scene3Start);
             }
+
+            function initScene4() {
+                gameState = 'scene4';
+                player.x = 100;
+                player.y = GROUND_Y - player.h;
+                camX = 0;
+                camY = 0;
+
+                // Reset arrays
+                platforms.length = 0;
+                memoryOrbs.length = 0;
+                
+                // Vertical Gauntlet Generation
+                let currentY = GROUND_Y - 150;
+                for(let i=0; i<15; i++) {
+                    let xPos = Math.random() * (canvas.width - 200) + 50;
+                    platforms.push({x: xPos, y: currentY, w: 120 + Math.random()*50, h: 20});
+                    currentY -= 140; // Go up
+                }
+
+                // Setup Warden Elite (Midway up)
+                wardenElite.x = 400;
+                wardenElite.y = platforms[5].y - 100;
+                wardenElite.hp = wardenElite.maxHp;
+                
+                // Setup Skill Node (Top)
+                skillNode.active = true;
+                skillNode.x = platforms[platforms.length-1].x + 30;
+                skillNode.y = platforms[platforms.length-1].y - 80;
+
+                document.getElementById('choiceOverlay').style.display = 'none';
+                document.getElementById('npcHpBar').style.display = 'block';
+                document.getElementById('npcHpBarTitle').innerText = "Warden Elite";
+                
+                startDialogue(scene4Start);
+            }
             
             function spawnMirrorBoss() {
                 updateQuest("Confront Yourself", "Defeat the Dark Reflection.");
@@ -1435,8 +1622,35 @@
                     createDamageNumber("Corruption Increased", player.x, player.y - 50, "#ff0000");
                 }
                 document.getElementById('choiceOverlay').style.display = 'none';
-                gameState = 'post-combat'; // Or transition to Act 3 in full game
-                updateQuest("Act II Complete", "The fracture deepens...");
+                initScene4(); // Move to Scene 4
+            }
+
+            function openSkillChoice() {
+                document.getElementById('skillOverlay').style.display = 'block';
+                player.velX = 0; // stop player
+            }
+
+            function makeSkillChoice(type) {
+                if (type === 'efficiency') {
+                    zeroPoint.efficiencyMod = 0.5;
+                    createDamageNumber("Efficiency Unlocked", player.x, player.y - 50, "#00ff00");
+                    const notif = document.getElementById('itemNotification');
+                    notif.querySelector('#itemTitle').innerText = "System Efficiency";
+                    notif.querySelector('#itemDesc').innerText = "Zero-Point charges faster and cools down instantly.";
+                    notif.style.transform = "translate(-50%, -50%) scale(1)";
+                    setTimeout(() => { notif.style.transform = "translate(-50%, -50%) scale(0)"; }, 4000);
+                } else {
+                    zeroPoint.powerMod = 2.0;
+                    createDamageNumber("Power Unlocked", player.x, player.y - 50, "#ff0000");
+                    const notif = document.getElementById('itemNotification');
+                    notif.querySelector('#itemTitle').innerText = "Unstable Overclock";
+                    notif.querySelector('#itemDesc').innerText = "Zero-Point damage doubled. Range increased.";
+                    notif.style.transform = "translate(-50%, -50%) scale(1)";
+                    setTimeout(() => { notif.style.transform = "translate(-50%, -50%) scale(0)"; }, 4000);
+                }
+                document.getElementById('skillOverlay').style.display = 'none';
+                skillNode.active = false;
+                updateQuest("Act II Complete", "The Iron Spine is conquered.");
             }
             
             function updateQuest(title, text) {
@@ -1498,19 +1712,20 @@
 
             // ===== UPDATE LOOP =====
             function update() {
-                if (menuOpen || gameState === 'dialogue' || gameState === 'choice') return;
+                if (menuOpen || gameState === 'dialogue' || gameState === 'choice' || (gameState==='scene4' && document.getElementById('skillOverlay').style.display === 'block')) return;
 
                 // --- ZERO-POINT UPDATE ---
                 if (zeroPoint.cooldown > 0) zeroPoint.cooldown--;
+                const chargeTime = zeroPoint.duration * zeroPoint.efficiencyMod;
                 if (zeroPoint.active) {
                     zeroPoint.timer++;
-                    if (zeroPoint.timer >= zeroPoint.duration) {
+                    if (zeroPoint.timer >= chargeTime) {
                         zeroPoint.charged = true;
                         document.getElementById('zeroPointHint').innerText = 'Zero-Point Ready! Press LMB to punch (or R to detonate)';
                     } else {
                         document.getElementById('zeroPointHint').innerText = 'Zero-Point Charging...';
                     }
-                    if ((!zeroPoint.charged && zeroPoint.timer > zeroPoint.duration + 30) || (zeroPoint.charged && zeroPoint.timer > zeroPoint.duration + 180)) {
+                    if ((!zeroPoint.charged && zeroPoint.timer > chargeTime + 30) || (zeroPoint.charged && zeroPoint.timer > chargeTime + 180)) {
                         zeroPoint.active = false; zeroPoint.timer = 0; zeroPoint.charged = false; document.getElementById('zeroPointHint').style.display = 'none';
                     }
                 }
@@ -1563,6 +1778,37 @@
                          mirrorAI();
                      }
                 }
+                
+                // Scene 4 Logic
+                if (gameState === 'scene4') {
+                    // Update Warden
+                    if (wardenElite.active) {
+                        wardenElite.x += wardenElite.velX; wardenElite.velX *= 0.9;
+                        wardenElite.y += wardenElite.velY;
+                        if (wardenElite.y + wardenElite.h < platforms[5].y) wardenElite.velY += 0.8; // Gravity
+                        else { wardenElite.y = platforms[5].y - wardenElite.h; wardenElite.velY = 0; }
+                        
+                        if (wardenElite.hitFlashTimer > 0) wardenElite.hitFlashTimer--;
+                        wardenAI();
+                    }
+                    
+                    // Interaction Text for Skill Node
+                    if (skillNode.active) {
+                         const dist = Math.abs((player.x + player.w/2) - (skillNode.x + skillNode.w/2));
+                         const distY = Math.abs((player.y + player.h/2) - (skillNode.y + skillNode.h/2));
+                         if(dist < 80 && distY < 80) document.getElementById('interactHint').style.display = 'block';
+                         else document.getElementById('interactHint').style.display = 'none';
+                    }
+                    
+                    // Fall check
+                    if (player.y > GROUND_Y + 100) {
+                        player.hp -= 10;
+                        player.y = GROUND_Y - player.h;
+                        player.velY = 0;
+                        camY = 0;
+                        createDamageNumber("FALL", player.x, player.y - 40, "#ff0000");
+                    }
+                }
 
                 // Player Physics
                 player.wasOnGround = player.onGround;
@@ -1596,8 +1842,8 @@
                     player.velX *= 0.95;
                 }
                 
-                if (player.justStartedSprinting) for(let i=0;i<10;i++) createDustParticle(player.x + player.w/2, GROUND_Y, -player.facing);
-                if (player.isSprinting && Math.random() < 0.35) createDustParticle(player.x + player.w/2, GROUND_Y, -player.facing);
+                if (player.justStartedSprinting) for(let i=0;i<10;i++) createDustParticle(player.x + player.w/2, player.y + player.h, -player.facing);
+                if (player.isSprinting && Math.random() < 0.35) createDustParticle(player.x + player.w/2, player.y + player.h, -player.facing);
 
                 if (keys[" "] && player.jumpCount < player.maxJumps) {
                     player.velY = -12;
@@ -1611,17 +1857,19 @@
                 // Ground Collision
                 let groundLevel = GROUND_Y;
                 
-                // Platform Collision (Scene 3)
-                if (gameState === 'scene3' && player.velY > 0) {
+                // Platform Collision (Scene 3 & 4)
+                if ((gameState === 'scene3' || gameState === 'scene4') && player.velY > 0) {
                      platforms.forEach(p => {
                          if (player.x + player.w > p.x && player.x < p.x + p.w &&
                              player.y + player.h <= p.y + player.velY + 2 && player.y + player.h >= p.y - 5) {
                                  groundLevel = p.y;
                              }
                      });
+                     if (gameState === 'scene4') groundLevel = (player.y + player.h > GROUND_Y && player.y + player.h < GROUND_Y + 20) ? GROUND_Y : groundLevel; // Base ground check
+                     if (gameState === 'scene4' && player.y + player.h > GROUND_Y + 50) groundLevel = 99999; // Allow fall through hole
                 }
                 
-                if (player.y + player.h >= groundLevel) {
+                if (player.y + player.h >= groundLevel && groundLevel !== 99999) {
                     if (!player.wasOnGround && oldVelY > 5) {
                         for(let i=0;i<16;i++) createDustParticle(player.x + player.w/2, groundLevel, 0);
                         triggerScreenShake(3, 2);
@@ -1646,12 +1894,19 @@
                         player.attackTime = 10; triggerScreenShake(15, 8);
                     }
                 }
+                if (gameState === 'scene4' && player.isDashing && wardenElite.active && !player.hasDashHit) {
+                    if (rectCollide({ x: player.x, y: player.y, w: player.w, h: player.h }, getNPCBox())) {
+                        dealDamageToWarden(player.stats.strength * 2.5, true, 12);
+                        player.velX = 0; player.isDashing = false; player.dashTime = 0; player.hasDashHit = true;
+                        player.attackTime = 10; triggerScreenShake(15, 8);
+                    }
+                }
                 
                 if (player.dashTime > 0) player.dashTime--;
                 if (player.isDashing && player.dashTime <= 0) { player.isDashing = false; player.velX *= 0.8; }
                 if (player.dashCooldown > 0) player.dashCooldown--;
 
-                if (mouseDown && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3')) universalPunch();
+                if (mouseDown && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3' || gameState === 'scene4')) universalPunch();
                 if (player.attackTime > 0) player.attackTime--;
                 if (player.attackCooldown > 0) player.attackCooldown--;
 
@@ -1676,6 +1931,14 @@
                 updateCombatMetrics(); 
                 if (screenShakeTime > 0) screenShakeTime--;
                 camX += ((player.x - canvas.width / 2) - camX) * 0.08;
+                // Vertical Camera Tracking for Scene 4
+                if (gameState === 'scene4') {
+                    let targetY = (player.y - canvas.height / 2);
+                    if (targetY > 0) targetY = 0; // Don't scroll below ground
+                    camY += (targetY - camY) * 0.1;
+                } else {
+                    camY = 0;
+                }
 
                 updateMainHUD();
                 updateCooldownUI();
@@ -1703,6 +1966,9 @@
                 } else if (mirrorBoss.active && gameState === 'scene3') {
                     document.getElementById("npcHpBarInner").style.width = (mirrorBoss.hp / mirrorBoss.maxHp * 100) + "%";
                     document.getElementById("npcHpBar").style.display = "block";
+                } else if (wardenElite.active && gameState === 'scene4') {
+                    document.getElementById("npcHpBarInner").style.width = (wardenElite.hp / wardenElite.maxHp * 100) + "%";
+                    document.getElementById("npcHpBar").style.display = "block";
                 } else {
                     document.getElementById("npcHpBar").style.display = "none";
                 }
@@ -1717,7 +1983,7 @@
             }
 
             function updateCooldownUI() {
-                const maxCooldowns = [90, 90, 180, 70]; 
+                const maxCooldowns = [90, 90, 180, 70 * zeroPoint.efficiencyMod]; 
                 for (let i = 0; i < 3; i++) {
                     const cooldown = abilityCooldowns[i]; const max = maxCooldowns[i] || 1; let ratio = cooldown / max; if (ratio < 0) ratio = 0;
                     document.getElementById("cool" + (i + 1)).style.clipPath = `inset(${ratio * 100}% 0 0 0)`;
@@ -1758,25 +2024,47 @@
                 ctx.translate(shakeOffsetX, shakeOffsetY);
                 
                 // BACKGROUND RENDERING
-                if (gameState === 'scene2' || gameState === 'scene3') {
-                    // Riftopia Background (Purple/Teal theme)
+                if (gameState === 'scene2' || gameState === 'scene3' || gameState === 'scene4') {
+                    // Base Sky
                     ctx.fillStyle = "#110022"; 
+                    if (gameState === 'scene4') ctx.fillStyle = "#1a0505"; // Dark Red Industrial for scene 4
                     let farX = (-camX * 0.1) % canvas.width;
-                    ctx.fillRect(farX - canvas.width, 0, canvas.width, GROUND_Y);
-                    ctx.fillRect(farX, 0, canvas.width, GROUND_Y);
+                    ctx.fillRect(farX - canvas.width, 0, canvas.width, canvas.height); // Full height fill
+                    ctx.fillRect(farX, 0, canvas.width, canvas.height);
 
+                    // Parallax elements
                     ctx.fillStyle = "#220044";
+                    if (gameState === 'scene4') ctx.fillStyle = "#330a0a";
                     let midX = (-camX * 0.3) % 500; 
                     for (let i = -3; i < canvas.width / 500 + 3; i++) {
                         ctx.fillRect(midX + i * 500, GROUND_Y - 180, 40, 180); // Tall pillars
                     }
                     
                     if (gameState === 'scene3') {
-                         // Floating debris for memory garden
                          ctx.fillStyle = "rgba(100, 200, 255, 0.1)";
                          for(let i=0; i<20; i++) {
                              ctx.fillRect((midX + i * 150) % canvas.width, (Date.now()/50 + i * 50) % (GROUND_Y/2), 20, 20);
                          }
+                    }
+
+                    // Scene 4 Industrial Background
+                    if (gameState === 'scene4') {
+                        ctx.save();
+                        ctx.translate(0, -camY * 0.5); // Parallax Y
+                        ctx.strokeStyle = "#441111";
+                        ctx.lineWidth = 10;
+                        // Draw massive girders in background
+                        for(let y = 0; y > -2000; y -= 300) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, y + GROUND_Y);
+                            ctx.lineTo(canvas.width, y + GROUND_Y - 100);
+                            ctx.stroke();
+                            // Cross beams
+                            ctx.moveTo(0, y + GROUND_Y - 100);
+                            ctx.lineTo(canvas.width, y + GROUND_Y);
+                            ctx.stroke();
+                        }
+                        ctx.restore();
                     }
                 } else {
                     // Standard Battlefield Background
@@ -1798,33 +2086,61 @@
                 // Foreground draw 
                 ctx.save(); 
                 ctx.translate(shakeOffsetX, shakeOffsetY);
-                ctx.translate(-camX, 0);
+                ctx.translate(-camX, -camY); // Apply Vertical Camera
 
                 // Floor
                 ctx.fillStyle = gameState === 'scene2' ? "#330044" : "#222";
                 if(gameState === 'scene3') ctx.fillStyle = "rgba(20, 0, 40, 0.9)";
+                if(gameState === 'scene4') ctx.fillStyle = "#221111";
                 ctx.fillRect(camX - 1000, GROUND_Y, canvas.width + 2000, 80);
                 
-                // --- DRAW SCENE 3 ELEMENTS ---
-                if (gameState === 'scene3') {
+                // --- DRAW SCENE 3 & 4 ELEMENTS ---
+                if (gameState === 'scene3' || gameState === 'scene4') {
                     // Platforms
-                    ctx.fillStyle = "#442266";
-                    ctx.shadowBlur = 10; ctx.shadowColor = "#8800ff";
+                    ctx.shadowBlur = 10; ctx.shadowColor = gameState === 'scene4' ? "#ff5500" : "#8800ff";
                     platforms.forEach(p => {
-                        ctx.fillRect(p.x, p.y, p.w, p.h);
-                    });
-                    
-                    // Orbs
-                    memoryOrbs.forEach(orb => {
-                        if (!orb.collected) {
-                            ctx.fillStyle = "#00ffff";
-                            ctx.shadowColor = "#fff"; ctx.shadowBlur = 15;
-                            const bob = Math.sin(Date.now() / 200) * 5;
-                            ctx.beginPath();
-                            ctx.arc(orb.x, orb.y + bob, 8, 0, Math.PI * 2);
-                            ctx.fill();
+                        // Industrial look for scene 4
+                        if (gameState === 'scene4') {
+                            ctx.fillStyle = "#443322";
+                            ctx.fillRect(p.x, p.y, p.w, p.h);
+                            ctx.fillStyle = "#111"; // Rivets
+                            ctx.fillRect(p.x + 10, p.y + 5, 5, 5);
+                            ctx.fillRect(p.x + p.w - 15, p.y + 5, 5, 5);
+                        } else {
+                            ctx.fillStyle = "#442266";
+                            ctx.fillRect(p.x, p.y, p.w, p.h);
                         }
                     });
+                    
+                    // Orbs (Scene 3)
+                    if (gameState === 'scene3') {
+                        memoryOrbs.forEach(orb => {
+                            if (!orb.collected) {
+                                ctx.fillStyle = "#00ffff";
+                                ctx.shadowColor = "#fff"; ctx.shadowBlur = 15;
+                                const bob = Math.sin(Date.now() / 200) * 5;
+                                ctx.beginPath();
+                                ctx.arc(orb.x, orb.y + bob, 8, 0, Math.PI * 2);
+                                ctx.fill();
+                            }
+                        });
+                    }
+                    
+                    // Skill Node (Scene 4)
+                    if (gameState === 'scene4' && skillNode.active) {
+                        ctx.shadowBlur = 20; ctx.shadowColor = "#ff0000";
+                        ctx.fillStyle = "#330000";
+                        ctx.fillRect(skillNode.x, skillNode.y, skillNode.w, skillNode.h);
+                        // Pulse Core
+                        ctx.fillStyle = "#ff2222";
+                        const pulse = Math.sin(Date.now() / 150) * 5;
+                        ctx.beginPath();
+                        ctx.arc(skillNode.x + skillNode.w/2, skillNode.y + skillNode.h/2, 10 + pulse, 0, Math.PI*2);
+                        ctx.fill();
+                        ctx.font = "12px Arial"; ctx.fillStyle = "#fff"; ctx.textAlign = "center";
+                        ctx.fillText("CORE", skillNode.x + skillNode.w/2, skillNode.y - 10);
+                    }
+
                     ctx.shadowBlur = 0;
                     
                     // Mirror Boss
@@ -1836,6 +2152,22 @@
                         ctx.fillRect(mirrorBoss.x + (player.x < mirrorBoss.x ? 5 : 25), mirrorBoss.y + 10, 5, 2);
                     }
                     
+                    // Warden Elite
+                    if (wardenElite.active) {
+                        ctx.fillStyle = wardenElite.hitFlashTimer > 0 ? "#fff" : "#442200";
+                        ctx.fillRect(wardenElite.x, wardenElite.y, wardenElite.w, wardenElite.h);
+                        // Armor details
+                        ctx.fillStyle = "#221100";
+                        ctx.fillRect(wardenElite.x - 5, wardenElite.y + 20, 10, 40); // Shoulder
+                        ctx.fillRect(wardenElite.x + wardenElite.w - 5, wardenElite.y + 20, 10, 40); // Shoulder
+                        // Eyes
+                        ctx.fillStyle = "#ffaa00";
+                        ctx.shadowBlur = 10; ctx.shadowColor = "#ffaa00";
+                        ctx.fillRect(wardenElite.x + 20, wardenElite.y + 15, 15, 5);
+                        ctx.fillRect(wardenElite.x + 45, wardenElite.y + 15, 15, 5);
+                        ctx.shadowBlur = 0;
+                    }
+
                     // Choice Mirror
                     if (choiceMirror.active) {
                         ctx.fillStyle = "#55eeff";
@@ -1973,12 +2305,14 @@
 
                 // --- DRAW ZERO-POINT DIAMOND UI ---
                 if (zeroPoint.active || zeroPoint.charged) {
-                    const cx = canvas.width / 2; const cy = canvas.height / 2 - 80; const size = 36; const progress = Math.min(1, zeroPoint.timer / zeroPoint.duration);
+                    const cx = canvas.width / 2; const cy = canvas.height / 2 - 80; const size = 36; 
+                    const chargeTime = zeroPoint.duration * zeroPoint.efficiencyMod;
+                    const progress = Math.min(1, zeroPoint.timer / chargeTime);
                     ctx.save();
                     const auraAlpha = zeroPoint.charged ? 0.9 : 0.25 + Math.sin(Date.now() * 0.03) * 0.12;
-                    ctx.globalAlpha = auraAlpha; ctx.fillStyle = '#8b0000'; ctx.beginPath();
+                    ctx.globalAlpha = auraAlpha; ctx.fillStyle = zeroPoint.efficiencyMod < 1 ? '#00aa00' : '#8b0000'; ctx.beginPath();
                     ctx.ellipse(cx, cy, size * (1.0 + (zeroPoint.charged ? 0.3 : 0.1)), size * (1.0 + (zeroPoint.charged ? 0.3 : 0.1)), 0, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
-                    const diamondColor = zeroPoint.charged ? '#ff6666' : '#a60000';
+                    const diamondColor = zeroPoint.charged ? (zeroPoint.powerMod > 1 ? '#ffaa00' : '#ff6666') : (zeroPoint.efficiencyMod < 1 ? '#005500' : '#a60000');
                     ctx.fillStyle = diamondColor; ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath();
                     ctx.moveTo(cx, cy - size); ctx.lineTo(cx + size, cy); ctx.lineTo(cx, cy + size); ctx.lineTo(cx - size, cy); ctx.closePath(); ctx.fill(); ctx.stroke();
                     const innerSize = size * (0.12 + 0.88 * progress);
