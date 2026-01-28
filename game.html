@@ -471,6 +471,82 @@
                 text-shadow: 0 0 6px #000;
             }
 
+            /* --- Act III Overlays & UI --- */
+            #shardTradeOverlay {
+                position: fixed;
+                right: 10px;
+                top: 120px;
+                width: 320px;
+                background: rgba(8, 10, 18, 0.95);
+                border: 1px solid #a0f;
+                padding: 12px;
+                z-index: 120;
+                color: #fff;
+                display: none;
+                border-radius: 6px;
+            }
+            #bastionInfo {
+                position: fixed;
+                top: 10px;
+                left: 250px;
+                padding: 8px 12px;
+                background: rgba(0,0,0,0.6);
+                border: 1px solid #ff88ff;
+                color: #fff;
+                z-index: 10;
+                display: none;
+            }
+            #assemblyOverlay {
+                position: fixed;
+                left: 50%;
+                top: 45%;
+                transform: translate(-50%,-50%);
+                background: rgba(0,0,0,0.95);
+                border: 2px solid #ffd07a;
+                padding: 20px;
+                color: #fff;
+                z-index: 150;
+                display: none;
+                width: 420px;
+                border-radius: 8px;
+            }
+            #finalChoiceOverlay {
+                position: fixed;
+                left: 50%;
+                top: 30%;
+                transform: translate(-50%,-30%);
+                background: rgba(0,0,0,0.95);
+                border: 2px solid #ff66aa;
+                padding: 24px;
+                color: #fff;
+                z-index: 160;
+                display: none;
+                width: 640px;
+                border-radius: 8px;
+                text-align: center;
+            }
+            .finalOption {
+                margin: 10px 0;
+                background: rgba(255,255,255,0.06);
+                padding: 10px;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+            #endingScreen {
+                position: fixed;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.96);
+                color: #fff;
+                display: none;
+                z-index: 999;
+                text-align: center;
+                padding-top: 140px;
+                box-sizing: border-box;
+            }
+
             @media (max-width: 420px) {
                 #abilityBar { right: 6px; bottom: 6px; width: 110px; transform: rotate(-3deg); padding: 6px; }
                 .abilitySlot { width: 90px; height: 24px; transform: rotate(3deg); padding: 3px 5px; }
@@ -603,9 +679,44 @@
         
         <div id="whispers"></div>
 
+        <!-- Act III UI -->
+        <div id="shardTradeOverlay">
+            <h3>Shardkeepers' Exchange</h3>
+            <div id="tradeText">A hooded Shardkeeper offers a trade: shards for upgrades or intel.</div>
+            <div style="margin-top:10px;">
+                <button onclick="doTrade('heal')" style="margin-right:6px">Trade 1 Shard → Heal (+50 HP)</button>
+                <button onclick="doTrade('intel')" style="margin-right:6px">Trade 1 Shard → Intel (Reveal Weakness)</button>
+                <button onclick="doTrade('xp')" style="margin-right:6px">Trade 1 Shard → +200 XP</button>
+            </div>
+            <div style="margin-top:10px; font-size:13px;">Press T to toggle this window when near a Shardkeeper.</div>
+        </div>
+
+        <div id="bastionInfo">Act III — The Core Bastion: Prepare. Speak to Shardkeepers, complete optional trials.</div>
+
+        <div id="assemblyOverlay">
+            <h2>Core Assembly</h2>
+            <p>You have <span id="shardCountUI">0</span> Shards. The Core requires <b id="shardsNeededUI">4</b>.</p>
+            <div style="margin-top:12px;">
+                <button onclick="attemptAssembleCore()">Assemble Core</button>
+                <button onclick="document.getElementById('assemblyOverlay').style.display='none'">Close</button>
+            </div>
+            <p style="margin-top:12px; color:#ccc;">Assembling triggers the Final Confrontation. Make sure you're ready.</p>
+        </div>
+
+        <div id="finalChoiceOverlay">
+            <h2>The Reassembled Core</h2>
+            <p>You stand before the raw Core. Its code hums with choices that will shape reality.</p>
+            <div class="finalOption" onclick="chooseFinal('restore')"><b>Restore Reality</b> — Use the Core to heal the fracture. (Low Corruption required)</div>
+            <div class="finalOption" onclick="chooseFinal('power')"><b>Embrace the Corruption</b> — Merge with the Core and use its might. (High Corruption)</div>
+            <div class="finalOption" onclick="chooseFinal('sacrifice')"><b>Sacrifice the Core</b> — Destroy it to save others, but lose its power.</div>
+            <div style="margin-top:12px; font-size:12px; color:#ddd;">Your corruption: <span id="corruptionUI">0</span></div>
+        </div>
+
+        <div id="endingScreen"></div>
+
         <script>
             // ===== GAME STATE & CORE SETUP =====
-            let gameState = 'dialogue'; // 'dialogue', 'combat', 'post-combat', 'scene2', 'scene3', 'choice', 'scene4'
+            let gameState = 'dialogue'; // 'dialogue', 'combat', 'post-combat', 'scene2', 'scene3', 'scene4', 'scene5', 'scene6', 'final', 'ending', 'choice'
             const canvas = document.getElementById("gameCanvas");
             const ctx = canvas.getContext("2d");
             canvas.width = innerWidth;
@@ -731,6 +842,35 @@
                 h: 60
             };
 
+            // ===== ACT III: Bastion & Final =====
+            // Shardkeepers & Bastion NPCs
+            const shardkeepers = []; // positions of keeper NPCs
+            const bastionEchoes = []; // pleading echoes that warn about Zero-Point
+            let inShardkeeperRange = false;
+            let shardkeeperActive = null;
+
+            // Arena / optional trials
+            let arenaActive = false;
+            const arenaEnemies = []; // simple enemies for wave fights
+
+            // Final Core & Fracturer Boss
+            let shardsNeededForCore = 4;
+            let coreAssembled = false;
+            const fracturer = {
+                active: false,
+                x: 0,
+                y: 0,
+                w: 60,
+                h: 90,
+                hp: 3500,
+                maxHp: 3500,
+                velX: 0,
+                velY: 0,
+                attackCooldown: 0,
+                phase: 0,
+                hitFlashTimer: 0
+            };
+
             // ===== COMBAT METRICS =====
             const combatMetrics = {
                 totalDamage: 0,
@@ -825,14 +965,38 @@
                     if (k === 'e') makeSkillChoice('efficiency');
                     if (k === 'r') makeSkillChoice('power');
                 }
-                
+
+                // Shardkeeper trade toggles (Act III)
+                if ((gameState === 'scene5' || gameState === 'bastion') && k === 't' && inShardkeeperRange) {
+                    shardkeeperActive = shardkeepers[0] || null;
+                    document.getElementById('shardTradeOverlay').style.display = document.getElementById('shardTradeOverlay').style.display === 'block' ? 'none' : 'block';
+                }
+
+                // Open assembly if in Bastion and core possible
+                if ((gameState === 'scene5' || gameState === 'bastion') && k === 'e') {
+                    // simple check for assemble pedestal proximity
+                    if (coreAssemblyPedestal && Math.abs((player.x + player.w/2) - (coreAssemblyPedestal.x + coreAssemblyPedestal.w/2)) < 80 &&
+                        Math.abs((player.y + player.h/2) - (coreAssemblyPedestal.y + coreAssemblyPedestal.h/2)) < 80) {
+                        document.getElementById('assemblyOverlay').style.display = 'block';
+                        document.getElementById('shardCountUI').innerText = player.inventory.shards;
+                        document.getElementById('shardsNeededUI').innerText = shardsNeededForCore;
+                    }
+                }
+
+                // Open final choice by keyboard during scene6 when allowed
+                if (gameState === 'scene6' && document.getElementById('finalChoiceOverlay').style.display === 'block') {
+                    if (k === 'e') chooseFinal('restore');
+                    if (k === 'r') chooseFinal('power');
+                    if (k === 'f') chooseFinal('sacrifice');
+                }
+
                 keys[k] = true;
             });
             document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
             
             let mouseDown = false;
             canvas.addEventListener("mousedown", (e) => {
-                if (e.button === 0 && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3' || gameState === 'scene4')) mouseDown = true;
+                if (e.button === 0 && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3' || gameState === 'scene4' || gameState === 'scene5' || gameState === 'scene6')) mouseDown = true;
             });
             canvas.addEventListener("mouseup", (e) => {
                 if (e.button === 0) mouseDown = false;
@@ -840,7 +1004,7 @@
 
             let menuOpen = false;
             document.addEventListener("keydown", (e) => {
-                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4') return; 
+                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4' && gameState !== 'scene5' && gameState !== 'scene6') return; 
                 if (e.key.toLowerCase() === "c") {
                     menuOpen = !menuOpen;
                     document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
@@ -986,6 +1150,15 @@
                      }
                 }
 
+                // Damage fracturer (final) if present
+                if ((gameState === 'scene6' || gameState === 'final') && fracturer.active) {
+                    const distF = Math.abs((player.x + player.w/2) - (fracturer.x + fracturer.w/2));
+                    if (distF < range) {
+                        fracturer.hp -= finalDamage;
+                        createDamageNumber(Math.floor(finalDamage), fracturer.x + fracturer.w/2, fracturer.y, "#ff99ff");
+                    }
+                }
+
                 vfxQueue.push({ type: 'zeroImpact', life: 18, color: '#000000', intensity: multiplier });
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ffffff", Math.max(20, 40 * multiplier), 18 * multiplier);
                 burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#ff0000", Math.max(12, 30 * multiplier), 16 * multiplier);
@@ -998,7 +1171,7 @@
 
             // ===== COMBAT SYSTEM =====
             function rectCollide(a, b) {
-                return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + a.h && a.y + a.h > b.y;
+                return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
             }
 
             function getNPCBox() { 
@@ -1008,6 +1181,8 @@
                     return { x: mirrorBoss.x, y: mirrorBoss.y, w: mirrorBoss.w, h: mirrorBoss.h };
                 if (gameState === 'scene4' && wardenElite.active)
                     return { x: wardenElite.x, y: wardenElite.y, w: wardenElite.w, h: wardenElite.h };
+                if ((gameState === 'scene6' || gameState === 'final') && fracturer.active)
+                    return { x: fracturer.x, y: fracturer.y, w: fracturer.w, h: fracturer.h };
                 return {x: -1000, y: -1000, w: 0, h:0};
             }
 
@@ -1147,6 +1322,7 @@
                 if (gameState === 'combat') sourceX = riftGuardian.x;
                 else if (gameState === 'scene3') sourceX = mirrorBoss.x;
                 else if (gameState === 'scene4') sourceX = wardenElite.x;
+                else if (gameState === 'scene6' || gameState === 'final') sourceX = fracturer.x;
                 
                 let guardianDir = (player.x + player.w/2 < sourceX) ? 1 : -1; 
                 
@@ -1168,7 +1344,10 @@
                     if(gameState==='combat') dealDamageToGuardian(reflectedDmg, true, 2); 
                     if(gameState==='scene3') dealDamageToMirrorBoss(reflectedDmg, true, 2);
                     if(gameState==='scene4') dealDamageToWarden(reflectedDmg, true, 2);
-                    createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", sourceX, GROUND_Y - 40, "#00ff00");
+                    if(gameState==='scene6' || gameState === 'final') {
+                        if (fracturer.active) fracturer.hp -= reflectedDmg;
+                        createDamageNumber(reflectedDmg.toFixed(1) + " Reflect", sourceX, GROUND_Y - 40, "#00ff00");
+                    }
                 }
                 
                 player.hp -= incomingDmg;
@@ -1294,6 +1473,12 @@
                         if (gameState === 'combat') dealDamageToGuardian(damage, false, knockback);
                         else if (gameState === 'scene3') dealDamageToMirrorBoss(damage, false, knockback);
                         else if (gameState === 'scene4') dealDamageToWarden(damage, false, knockback);
+                        else if (gameState === 'scene6' || gameState === 'final') {
+                            if (fracturer.active) {
+                                fracturer.hp -= damage;
+                                createDamageNumber(Math.floor(damage), fracturer.x + fracturer.w/2, fracturer.y, "#ff99ff");
+                            }
+                        }
                     }
                     
                     // Hit Confirmation Logic for VFX (Simplified)
@@ -1339,12 +1524,12 @@
             function energy_ability2() { if (abilityCooldowns[1] > 0 || player.energy < 40) return; player.energy -= 40; abilityCooldowns[1] = 150; let dmg = player.stats.energy * 1.5; dealDamageToGuardian(dmg, true, 25); dealDamageToMirrorBoss(dmg, true, 25); dealDamageToWarden(dmg, true, 10); burstParticles(player.x + player.w / 2, player.y + player.h / 2, "#00ffff", 60, 15); triggerScreenShake(20,12); }
             function energy_ability3() { if (abilityCooldowns[2] > 0 || player.energy < 15) return; player.energy -= 15; abilityCooldowns[2] = 60; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); player.x += player.facing * 150; createAfterimage(player.x, player.y, player.w, player.h, "#8800ff99"); burstParticles(player.x, player.y + player.h / 2, "#8800ff", 25, 6); }
 
-            function ability1() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4')) return; if (savedBuild === 'Strength') strength_ability1(); else if (savedBuild === 'Defense') defense_ability1(); else if (savedBuild === 'Energy') energy_ability1(); }
-            function ability2() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4')) return; if (savedBuild === 'Speed') speed_ability2(); else if (savedBuild === 'Strength') strength_ability2(); else if (savedBuild === 'Defense') defense_ability2(); else if (savedBuild === 'Energy') energy_ability2(); }
-            function ability3() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4')) return; if (savedBuild === 'Speed') speed_ability3(); else if (savedBuild === 'Strength') strength_ability3(); else if (savedBuild === 'Defense') defense_ability3(); else if (savedBuild === 'Energy') energy_ability3(); }
+            function ability1() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4' && gameState !== 'scene5' && gameState !== 'scene6')) return; if (savedBuild === 'Strength') strength_ability1(); else if (savedBuild === 'Defense') defense_ability1(); else if (savedBuild === 'Energy') energy_ability1(); }
+            function ability2() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4' && gameState !== 'scene5' && gameState !== 'scene6')) return; if (savedBuild === 'Speed') speed_ability2(); else if (savedBuild === 'Strength') strength_ability2(); else if (savedBuild === 'Defense') defense_ability2(); else if (savedBuild === 'Energy') energy_ability2(); }
+            function ability3() { if (menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4' && gameState !== 'scene5' && gameState !== 'scene6')) return; if (savedBuild === 'Speed') speed_ability3(); else if (savedBuild === 'Strength') strength_ability3(); else if (savedBuild === 'Defense') defense_ability3(); else if (savedBuild === 'Energy') energy_ability3(); }
 
             document.addEventListener("keydown", (e) => {
-                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4') return;
+                if (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4' && gameState !== 'scene5' && gameState !== 'scene6') return;
                 if (e.key === "1") ability1();
                 if (e.key === "2") ability2();
                 if (e.key === "3") ability3();
@@ -1362,7 +1547,7 @@
 
             canvas.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                if (zeroPoint.cooldown > 0 || menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4')) return;
+                if (zeroPoint.cooldown > 0 || menuOpen || (gameState !== 'combat' && gameState !== 'post-combat' && gameState !== 'scene3' && gameState !== 'scene4' && gameState !== 'scene5' && gameState !== 'scene6')) return;
                 startZeroPointCharge();
             });
 
@@ -1418,12 +1603,26 @@
                 { speaker: "Dark Reflection", text: "It doesn't matter. You failed them anyway." },
             ];
 
-            const scene4Start = [
-                { speaker: "???", text: "The architecture is changing... rigid. Cold. Metal replaces the memories." },
-                { speaker: "Warden Elite", text: "ANOMALY DETECTED. YOU SEEK TO HEAL THE FRACTURE? YOU ARE THE DISEASE." },
-                { speaker: "???", text: "I'm not here to heal it. I'm here to understand why it was broken." },
-                { speaker: "Warden Elite", text: "THE FRACTURER BROKE THE WORLD TO SAVE IT FROM THE RESET. TO FREEZE US IN TIME." },
-                { speaker: "???", text: "A frozen world is a dead world. Move aside." }
+            // Act III dialogues: Bastion & Final
+            const scene5Dialogue = [
+                { speaker: "System", text: "Act III — Entering: Core Bastion approach." },
+                { speaker: "Shardkeeper", text: "Traveler. We keep shards. Trade fairly and tell us... do not spill the Core's blood." },
+                { speaker: "Echo", text: "Stop using the Zero-Point recklessly. It eats at what remains of you." },
+                { speaker: "???", text: "This place hums. The Core pulses like a heart... but it is broken." }
+            ];
+
+            const scene6Start = [
+                { speaker: "System", text: "Final Assembly — The Core awaits." },
+                { speaker: "Whisper", text: "Rebuild. Remember. Choose." },
+            ];
+
+            const finalRevealLines = [
+                { speaker: "Fracturer", text: "You finally made it." },
+                { speaker: "Fracturer", text: "You always were stubborn. I couldn't bear to lose you again." },
+                { speaker: "???", text: "Who... you said 'you'? Who are you?" },
+                { speaker: "Fracturer", text: "I am what was left. Your brother. I locked us away to save you from the reset." },
+                { speaker: "???", text: "Brother...? You trapped me!" },
+                { speaker: "Fracturer", text: "I did what I had to. Now finish me, or join me." },
             ];
 
             let currentMonologueIndex = 0;
@@ -1496,6 +1695,20 @@
                         document.getElementById('questTracker').style.display = 'block';
                         updateQuest("Iron Gauntlet", "Climb the tower. Defeat the Warden Elite.");
                         wardenElite.active = true;
+                    } else if (currentDialogueArray === scene5Dialogue) {
+                        // Bastion approach active
+                        gameState = 'scene5';
+                        document.getElementById('bastionInfo').style.display = 'block';
+                        document.getElementById('questTracker').style.display = 'block';
+                        updateQuest("Approach: Core Bastion", "Meet the Shardkeepers. Prepare for the final ascent.");
+                        setupBastion();
+                    } else if (currentDialogueArray === scene6Start) {
+                        gameState = 'scene6';
+                        document.getElementById('combatInfo').style.display = 'flex';
+                        document.getElementById('questTracker').style.display = 'block';
+                        updateQuest("Final Assembly", "Assemble the Core and confront the Fracturer.");
+                    } else if (currentDialogueArray === finalRevealLines) {
+                        // Handled within the reveal flow
                     }
                 }
             }
@@ -1651,11 +1864,255 @@
                 document.getElementById('skillOverlay').style.display = 'none';
                 skillNode.active = false;
                 updateQuest("Act II Complete", "The Iron Spine is conquered.");
+                // Prepare and transition to Act III after short delay
+                prepareActIII();
             }
             
             function updateQuest(title, text) {
                 document.getElementById('questTitle').innerText = title;
                 document.getElementById('questText').innerText = text;
+            }
+
+            // ===== ACT III: Helper Functions =====
+            function prepareActIII() {
+                // Announce Act III and prepare Bastion spawn
+                setTimeout(() => {
+                    startDialogue(scene5Dialogue);
+                }, 1200);
+            }
+
+            function setupBastion() {
+                // Position player at Bastion approach
+                player.x = 180;
+                player.y = GROUND_Y - player.h;
+                camX = 0;
+                // Spawn a couple of Shardkeepers and Echoes
+                shardkeepers.length = 0;
+                shardkeepers.push({ x: 500, y: GROUND_Y - 60, w: 36, h: 60 });
+                shardkeepers.push({ x: 800, y: GROUND_Y - 60, w: 36, h: 60 });
+                bastionEchoes.length = 0;
+                bastionEchoes.push({ x: 620, y: GROUND_Y - 60, w: 30, h: 60, text: "Please... the Zero-Point takes and doesn't give back." });
+                // Assembly pedestal
+                coreAssemblyPedestal = { x: 1100, y: GROUND_Y - 40, w: 80, h: 40 };
+                document.getElementById('shardTradeOverlay').style.display = 'none';
+                document.getElementById('bastionInfo').style.display = 'block';
+                gameState = 'scene5';
+                updateQuest("Meet the Shardkeepers", "Trade or prepare. Optional trials weaken the creature within the Core.");
+                // Make sure ability bar is visible
+                document.getElementById('abilityBar').style.display = 'flex';
+            }
+
+            let coreAssemblyPedestal = null;
+
+            function doTrade(type) {
+                if (player.inventory.shards <= 0) {
+                    createDamageNumber("No Shards", player.x, player.y - 40, "#ff4444");
+                    return;
+                }
+                player.inventory.shards--;
+                if (type === 'heal') {
+                    player.hp = Math.min(player.maxHp, player.hp + 50);
+                    createDamageNumber("+50 HP", player.x, player.y - 40, "#00ff88");
+                } else if (type === 'intel') {
+                    // Intel reveals a weakness for the final boss -- reduce its HP later
+                    player._intel = (player._intel || 0) + 1;
+                    createDamageNumber("Intel Acquired", player.x, player.y - 40, "#88ccff");
+                } else if (type === 'xp') {
+                    gainXP(200);
+                }
+                document.getElementById('shardCountUI').innerText = player.inventory.shards;
+            }
+
+            // Arena / optional trials
+            function startArenaTrial() {
+                if (arenaActive) return;
+                arenaActive = true;
+                arenaEnemies.length = 0;
+                updateQuest("Arena Trial", "Defeat the waves. Rewards: shards & intel.");
+                // spawn several enemies
+                for (let i = 0; i < 4; i++) {
+                    arenaEnemies.push({ x: 600 + i * 80, y: GROUND_Y - 60, w: 36, h: 48, hp: 80, velX: 0 });
+                }
+            }
+
+            function updateArena() {
+                if (!arenaActive) return;
+                // simple AI: move towards player and attack
+                for (let i = arenaEnemies.length - 1; i >= 0; i--) {
+                    const e = arenaEnemies[i];
+                    const dx = player.x - e.x;
+                    e.velX += Math.sign(dx) * 0.05;
+                    e.velX *= 0.9;
+                    e.x += e.velX;
+                    if (Math.abs(player.x - e.x) < 40 && Math.random() < 0.02) dealDamageToPlayer(8);
+                }
+                // check if all defeated (hp <= 0)
+                if (arenaEnemies.every(e => e.hp <= 0)) {
+                    // reward: shards and intel
+                    player.inventory.shards += 1;
+                    player._intel = (player._intel || 0) + 1;
+                    createDamageNumber("Trial Complete +1 Shard", player.x, player.y - 40, "#ffff88");
+                    arenaActive = false;
+                    updateQuest("Bastion: Trials Complete", "You earned shard(s) and intel.");
+                }
+            }
+
+            // Final Core assembly
+            function attemptAssembleCore() {
+                if (player.inventory.shards < shardsNeededForCore) {
+                    createDamageNumber("Need more shards", player.x, player.y - 40, "#ff6666");
+                    return;
+                }
+                // consume shards
+                player.inventory.shards -= shardsNeededForCore;
+                coreAssembled = true;
+                document.getElementById('assemblyOverlay').style.display = 'none';
+                updateQuest("Core Assembled", "The Core hums. Prepare for revelation.");
+                // Transition to scene6 / final assembly
+                setTimeout(() => {
+                    startDialogue(scene6Start);
+                    // after dialogue, spawn the Fracturer
+                    setTimeout(() => {
+                        spawnFracturerBoss();
+                    }, 1200);
+                }, 800);
+            }
+
+            // Spawn final boss (Fracturer)
+            function spawnFracturerBoss() {
+                fracturer.active = true;
+                fracturer.hp = fracturer.maxHp;
+                fracturer.x = coreAssemblyPedestal.x + 60;
+                fracturer.y = coreAssemblyPedestal.y - fracturer.h;
+                gameState = 'scene6';
+                document.getElementById('npcHpBar').style.display = 'block';
+                document.getElementById('npcHpBarTitle').innerText = "The Fracturer";
+                updateQuest("Confront the Fracturer", "Face the reassembled memory.");
+                // Trigger reveal dialogue as fight begins
+                playFracturerReveal();
+            }
+
+            // Reveal & fight: the Fracturer is revealed as brother
+            function playFracturerReveal() {
+                // Play reveal lines as staged monologue before full fight AI engages
+                currentDialogueArray = finalRevealLines;
+                currentMonologueIndex = 0;
+                document.getElementById('dialogueBox').style.display = 'block';
+                typeMonologue(currentDialogueArray[currentMonologueIndex]);
+                // After those lines finish, allow fight to proceed
+            }
+
+            // Simple Fracturer AI
+            function fracturerAI() {
+                if ((!fracturer.active) || (gameState !== 'scene6' && gameState !== 'final')) return;
+                // phases based on remaining HP
+                if (fracturer.attackCooldown > 0) fracturer.attackCooldown--;
+                // Move to engage player
+                const dx = player.x - fracturer.x;
+                fracturer.velX += Math.sign(dx) * 0.15;
+                fracturer.velX *= 0.9;
+                fracturer.x += fracturer.velX;
+                // Attack patterns
+                if (fracturer.hp > fracturer.maxHp * 0.6) {
+                    // aggressive strikes
+                    if (Math.abs(dx) < 140 && fracturer.attackCooldown <= 0) {
+                        dealDamageToPlayer(18 + player.level * 1);
+                        fracturer.attackCooldown = 70;
+                        burstParticles(fracturer.x + fracturer.w/2, fracturer.y + fracturer.h/2, "#ff77ff", 18, 6);
+                    }
+                } else if (fracturer.hp > fracturer.maxHp * 0.3) {
+                    if (Math.abs(dx) < 200 && fracturer.attackCooldown <= 0) {
+                        // telegraphed shockwave
+                        fracturer.attackCooldown = 90;
+                        triggerScreenShake(10, 8);
+                        burstParticles(fracturer.x + fracturer.w/2, fracturer.y + fracturer.h/2, "#ff4444", 40, 10);
+                        if (Math.abs(player.x - fracturer.x) < 240) dealDamageToPlayer(28);
+                    }
+                } else {
+                    // enraged final phase
+                    if (fracturer.attackCooldown <= 0) {
+                        fracturer.attackCooldown = 40;
+                        // multi-hit
+                        for (let i=0;i<3;i++) setTimeout(()=>{ if (Math.abs(player.x - fracturer.x) < 240) dealDamageToPlayer(12); burstParticles(fracturer.x, fracturer.y, "#ffccff", 10, 6); }, i*120);
+                    }
+                }
+
+                // if fracturer dies, trigger reveal end & show final choices
+                if (fracturer.hp <= 0 && fracturer.active) {
+                    fracturer.active = false;
+                    triggerFullFlash("#ffffff", 30);
+                    setTimeout(() => {
+                        // After the boss is defeated, show final choices: restore / corrupt / sacrifice
+                        gameState = 'final';
+                        document.getElementById('npcHpBar').style.display = 'none';
+                        document.getElementById('finalChoiceOverlay').style.display = 'block';
+                        document.getElementById('corruptionUI').innerText = player.corruption;
+                        updateQuest("Core Reassembled", "Choose how the Core will be used.");
+                    }, 1100);
+                }
+            }
+
+            // Final choice handler
+            function chooseFinal(choice) {
+                document.getElementById('finalChoiceOverlay').style.display = 'none';
+                // Evaluate combined corruption & intel
+                const corruption = player.corruption;
+                const intel = player._intel || 0;
+                let endingType = 'neutral';
+                if (choice === 'restore') {
+                    if (corruption <= 0) {
+                        endingType = 'restoration';
+                    } else {
+                        endingType = 'compromised_restore';
+                    }
+                } else if (choice === 'power') {
+                    if (corruption >= 1) endingType = 'corrupt_power';
+                    else endingType = 'tempted_power';
+                } else if (choice === 'sacrifice') {
+                    endingType = 'sacrifice';
+                }
+                applyEnding(endingType, intel);
+            }
+
+            function applyEnding(type, intel) {
+                gameState = 'ending';
+                const endingEl = document.getElementById('endingScreen');
+                let title = '';
+                let body = '';
+                if (type === 'restoration') {
+                    title = "Restoration";
+                    body = "You chose to mend the fracture. The Core's code weaves reality back together. Memories return. The world breathes again. You and your brother awaken, whole.";
+                } else if (type === 'compromised_restore') {
+                    title = "Compromised Restoration";
+                    body = "You used the Core to restore reality, but corruption lingered. The world heals, yet echoes of change remain. You live in a slightly different future.";
+                } else if (type === 'corrupt_power') {
+                    title = "Ascend: Corruption";
+                    body = "You claimed the Core's power for yourself. The world bends to your will. Power tastes sweet—but the cost is isolation and a slowly folding mind.";
+                } else if (type === 'tempted_power') {
+                    title = "Tempted";
+                    body = "You attempted to wield the Core but your heart wasn't ready. Its backlash shattered your body—yet your name is whispered as a warning.";
+                } else if (type === 'sacrifice') {
+                    title = "Sacrifice";
+                    body = "You destroyed the Core to protect others, releasing its stored souls. You live on as guardian of their memory. The fracture fades, but so does your claim to power.";
+                } else {
+                    title = "Unknown";
+                    body = "A choice was made. Its consequences ripple silently.";
+                }
+                // Apply minor gameplay consequences for flavor (not persistent)
+                if (type === 'restoration' || type === 'compromised_restore') {
+                    player.hp = player.maxHp;
+                    player.xp += 500 + (intel * 100);
+                } else if (type === 'corrupt_power') {
+                    player.stats.strength += 6 + intel;
+                    player.corruption += 2;
+                } else if (type === 'sacrifice') {
+                    player.unspentStatPoints += 5;
+                }
+                endingEl.innerHTML = `<h1 style="font-size:46px; margin-bottom:12px;">${title}</h1><p style="font-size:18px; max-width:900px; margin:0 auto 20px;">${body}</p><p style="color:#aaa;">Corruption: ${player.corruption}</p><div style="margin-top:26px;"><button onclick="location.reload()" style="padding:10px 18px; font-weight:bold;">Restart</button></div>`;
+                endingEl.style.display = 'block';
+                document.getElementById('questTracker').style.display = 'none';
+                document.getElementById('abilityBar').style.display = 'none';
+                document.getElementById('bastionInfo').style.display = 'none';
             }
 
             // ===== TUTORIAL =====
@@ -1810,6 +2267,35 @@
                     }
                 }
 
+                // Scene 5 (Bastion) logic
+                if (gameState === 'scene5') {
+                    // Update shardkeeper range checks
+                    inShardkeeperRange = false;
+                    for (let sk of shardkeepers) {
+                        if (Math.abs((player.x + player.w/2) - (sk.x + sk.w/2)) < 80 && Math.abs((player.y + player.h/2) - (sk.y + sk.h/2)) < 80) {
+                            inShardkeeperRange = true;
+                            break;
+                        }
+                    }
+                    // Echo dialogue when near
+                    for (let e of bastionEchoes) {
+                        if (Math.abs((player.x + player.w/2) - (e.x + e.w/2)) < 140) {
+                            // show small plea (create damage number style)
+                            if (Math.random() < 0.01) {
+                                createDamageNumber(e.text, e.x, e.y - 40, "#ff88ff");
+                            }
+                        }
+                    }
+                    // Arena logic
+                    updateArena();
+                }
+
+                // Scene 6 / Final logic
+                if ((gameState === 'scene6' || gameState === 'final')) {
+                    // fracturer AI
+                    fracturerAI();
+                }
+
                 // Player Physics
                 player.wasOnGround = player.onGround;
                 const oldVelY = player.velY;
@@ -1894,11 +2380,19 @@
                         player.attackTime = 10; triggerScreenShake(15, 8);
                     }
                 }
-                if (gameState === 'scene4' && player.isDashing && wardenElite.active && !player.hasDashHit) {
+                if ((gameState === 'scene4' || gameState === 'scene6' || gameState === 'scene5' || gameState === 'final') && player.isDashing && wardenElite.active && !player.hasDashHit) {
                     if (rectCollide({ x: player.x, y: player.y, w: player.w, h: player.h }, getNPCBox())) {
                         dealDamageToWarden(player.stats.strength * 2.5, true, 12);
                         player.velX = 0; player.isDashing = false; player.dashTime = 0; player.hasDashHit = true;
                         player.attackTime = 10; triggerScreenShake(15, 8);
+                    }
+                }
+                if ((gameState === 'scene6' || gameState === 'final') && player.isDashing && fracturer.active && !player.hasDashHit) {
+                    if (rectCollide({ x: player.x, y: player.y, w: player.w, h: player.h }, fracturer)) {
+                        fracturer.hp -= player.stats.strength * 2.5;
+                        player.velX = 0; player.isDashing = false; player.dashTime = 0; player.hasDashHit = true;
+                        player.attackTime = 10; triggerScreenShake(15, 8);
+                        createDamageNumber("Dash Hit!", fracturer.x + fracturer.w/2, fracturer.y, "#ff99ff");
                     }
                 }
                 
@@ -1906,7 +2400,7 @@
                 if (player.isDashing && player.dashTime <= 0) { player.isDashing = false; player.velX *= 0.8; }
                 if (player.dashCooldown > 0) player.dashCooldown--;
 
-                if (mouseDown && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3' || gameState === 'scene4')) universalPunch();
+                if (mouseDown && (gameState === 'combat' || gameState === 'post-combat' || gameState === 'scene3' || gameState === 'scene4' || gameState === 'scene5' || gameState === 'scene6')) universalPunch();
                 if (player.attackTime > 0) player.attackTime--;
                 if (player.attackCooldown > 0) player.attackCooldown--;
 
@@ -1969,6 +2463,10 @@
                 } else if (wardenElite.active && gameState === 'scene4') {
                     document.getElementById("npcHpBarInner").style.width = (wardenElite.hp / wardenElite.maxHp * 100) + "%";
                     document.getElementById("npcHpBar").style.display = "block";
+                } else if (fracturer.active && (gameState === 'scene6' || gameState === 'final')) {
+                    document.getElementById("npcHpBarInner").style.width = (fracturer.hp / fracturer.maxHp * 100) + "%";
+                    document.getElementById("npcHpBar").style.display = "block";
+                    document.getElementById('npcHpBarTitle').innerText = "The Fracturer";
                 } else {
                     document.getElementById("npcHpBar").style.display = "none";
                 }
@@ -2024,10 +2522,11 @@
                 ctx.translate(shakeOffsetX, shakeOffsetY);
                 
                 // BACKGROUND RENDERING
-                if (gameState === 'scene2' || gameState === 'scene3' || gameState === 'scene4') {
+                if (gameState === 'scene2' || gameState === 'scene3' || gameState === 'scene4' || gameState === 'scene5' || gameState === 'scene6') {
                     // Base Sky
                     ctx.fillStyle = "#110022"; 
                     if (gameState === 'scene4') ctx.fillStyle = "#1a0505"; // Dark Red Industrial for scene 4
+                    if (gameState === 'scene5' || gameState === 'scene6') ctx.fillStyle = "#081020"; // Bastion darker blue
                     let farX = (-camX * 0.1) % canvas.width;
                     ctx.fillRect(farX - canvas.width, 0, canvas.width, canvas.height); // Full height fill
                     ctx.fillRect(farX, 0, canvas.width, canvas.height);
@@ -2066,6 +2565,21 @@
                         }
                         ctx.restore();
                     }
+
+                    // Bastion-specific decorations
+                    if (gameState === 'scene5' || gameState === 'scene6') {
+                        ctx.save();
+                        ctx.fillStyle = "rgba(180,200,255,0.06)";
+                        for (let i = 0; i < 10; i++) {
+                            ctx.beginPath();
+                            ctx.ellipse(150 + i * 140 - camX*0.2, GROUND_Y - 260 + Math.sin(i + Date.now()/800)*40, 50, 20, 0, 0, Math.PI*2);
+                            ctx.fill();
+                        }
+                        ctx.restore();
+                        // show summit tower silhouette
+                        ctx.fillStyle = "#1a2030";
+                        ctx.fillRect(1200, GROUND_Y - 600, 240, 600);
+                    }
                 } else {
                     // Standard Battlefield Background
                     ctx.fillStyle = "#000033"; 
@@ -2092,20 +2606,24 @@
                 ctx.fillStyle = gameState === 'scene2' ? "#330044" : "#222";
                 if(gameState === 'scene3') ctx.fillStyle = "rgba(20, 0, 40, 0.9)";
                 if(gameState === 'scene4') ctx.fillStyle = "#221111";
+                if(gameState === 'scene5' || gameState === 'scene6') ctx.fillStyle = "#112033";
                 ctx.fillRect(camX - 1000, GROUND_Y, canvas.width + 2000, 80);
                 
                 // --- DRAW SCENE 3 & 4 ELEMENTS ---
-                if (gameState === 'scene3' || gameState === 'scene4') {
+                if (gameState === 'scene3' || gameState === 'scene4' || gameState === 'scene5' || gameState === 'scene6') {
                     // Platforms
                     ctx.shadowBlur = 10; ctx.shadowColor = gameState === 'scene4' ? "#ff5500" : "#8800ff";
                     platforms.forEach(p => {
-                        // Industrial look for scene 4
+                        // Industrial look for scene 4 and Bastion
                         if (gameState === 'scene4') {
                             ctx.fillStyle = "#443322";
                             ctx.fillRect(p.x, p.y, p.w, p.h);
                             ctx.fillStyle = "#111"; // Rivets
                             ctx.fillRect(p.x + 10, p.y + 5, 5, 5);
                             ctx.fillRect(p.x + p.w - 15, p.y + 5, 5, 5);
+                        } else if (gameState === 'scene5' || gameState === 'scene6') {
+                            ctx.fillStyle = "#2b3344";
+                            ctx.fillRect(p.x, p.y, p.w, p.h);
                         } else {
                             ctx.fillStyle = "#442266";
                             ctx.fillRect(p.x, p.y, p.w, p.h);
@@ -2175,6 +2693,42 @@
                         ctx.fillRect(choiceMirror.x, choiceMirror.y, choiceMirror.w, choiceMirror.h);
                         ctx.strokeStyle = "#fff"; ctx.strokeRect(choiceMirror.x, choiceMirror.y, choiceMirror.w, choiceMirror.h);
                         ctx.globalAlpha = 1;
+                    }
+
+                    // Shardkeepers & Bastion echoes
+                    if (gameState === 'scene5' || gameState === 'scene6') {
+                        // Shardkeepers
+                        shardkeepers.forEach(sk => {
+                            ctx.fillStyle = "#664477";
+                            ctx.fillRect(sk.x, sk.y, sk.w, sk.h);
+                            ctx.fillStyle = "#fff";
+                            ctx.font = "12px Arial";
+                            ctx.fillText("Shardkeeper", sk.x + sk.w/2, sk.y - 8);
+                        });
+                        // Echoes
+                        bastionEchoes.forEach(e => {
+                            ctx.fillStyle = "#88bbff";
+                            ctx.fillRect(e.x, e.y, e.w, e.h);
+                            if (Math.random() < 0.02) {
+                                ctx.fillStyle = "#fff";
+                                ctx.font = "10px Arial";
+                                ctx.fillText(`"${e.text}"`, e.x + e.w/2, e.y - 12);
+                            }
+                        });
+                        // Core pedestal
+                        if (coreAssemblyPedestal) {
+                            ctx.fillStyle = "#ffd07a";
+                            ctx.fillRect(coreAssemblyPedestal.x, coreAssemblyPedestal.y, coreAssemblyPedestal.w, coreAssemblyPedestal.h);
+                            ctx.fillStyle = "#000";
+                            ctx.fillText("Assembly Pedestal", coreAssemblyPedestal.x + coreAssemblyPedestal.w/2, coreAssemblyPedestal.y - 10);
+                        }
+                        // Arena enemies
+                        for (let e of arenaEnemies) {
+                            if (e.hp > 0) {
+                                ctx.fillStyle = "#993322";
+                                ctx.fillRect(e.x, e.y, e.w, e.h);
+                            }
+                        }
                     }
                 }
                 
