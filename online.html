@@ -424,7 +424,6 @@
             const ctx = canvas.getContext("2d");
             canvas.width = innerWidth;
             canvas.height = innerHeight;
-
             // ===== ROUND STATE =====
             let currentRound = 1;
             let team1Wins = 0;
@@ -437,14 +436,12 @@
             const roomId = urlParams.get('room');
             const maxPlayers = parseInt(urlParams.get('size')) || 2;
             const username = localStorage.getItem('fracture_username') || 'Guest';
-            
             let isGameRunning = false;
             let matchTime = 90; // 1:30
-            
             // ===== PLAYER STATS =====
             const player = {
-                x: 0,
-                y: 0,
+                x: -1000, // Off-screen until spawn
+                y: -1000,
                 w: 40,
                 h: 60,
                 velX: 0,
@@ -515,14 +512,13 @@
                     conn.send({ type: 'handshake', user: username });
 
                     if (mode === 'host') {
-                        if (assignedPlayers.length < maxPlayers - 1) {
-                            assignedPlayers.push(conn.peer);
-                            const idx = assignedPlayers.length;
-                            const team = idx < maxPlayers / 2 ? 1 : 2;
-                            conn.send({ type: 'init', index: idx, team: team, isSpectator: false });
-                        } else {
-                            conn.send({ type: 'init', isSpectator: true });
-                        }
+                        assignedPlayers.push(conn.peer);
+                        const idx = assignedPlayers.length; // Host is 0, first client is 1
+                        const isSpectator = idx >= maxPlayers;
+                        const team = idx < maxPlayers / 2 ? 1 : 2;
+                        
+                        conn.send({ type: 'init', index: idx, team: team, isSpectator: isSpectator });
+                        updateLobbyUI();
                     }
                 });
 
@@ -533,9 +529,9 @@
                         addChatMessage(`${data.user} joined the fray.`);
                     }
                     if (data.type === 'init') {
-                        player.index = data.index;
-                        player.team = data.team;
-                        player.isSpectator = data.isSpectator;
+                        player.index = data.index || 0;
+                        player.team = data.team || 1;
+                        player.isSpectator = !!data.isSpectator;
                         if (player.isSpectator) {
                             document.getElementById('spectatorUI').style.display = 'block';
                             document.getElementById('mainHud').style.display = 'none';
@@ -568,10 +564,10 @@
             }
 
             function updateLobbyUI() {
-                const total = connections.length + 1;
-                const spectators = total > maxPlayers ? total - maxPlayers : 0;
-                const playersCount = total - spectators;
-                document.getElementById('playerList').innerText = `Players: ${playersCount}/${maxPlayers} | Spectators: ${spectators}`;
+                const totalInRoom = connections.length + 1;
+                const playerCount = Math.min(totalInRoom, maxPlayers);
+                const spectatorCount = Math.max(0, totalInRoom - maxPlayers);
+                document.getElementById('playerList').innerText = `Players: ${playerCount}/${maxPlayers} | Spectators: ${spectatorCount}`;
             }
 
             function addChatMessage(msg) {
@@ -731,11 +727,13 @@
 
             function spawnPlayers() {
                 if (player.isSpectator) return;
-                const isTeam2 = player.team === 2;
-                const offset = isTeam2 ? (player.index - maxPlayers/2) : player.index;
                 
-                if (!isTeam2) player.x = 100 + (offset * 60);
-                else player.x = canvas.width - 160 - (offset * 60);
+                const teamSize = maxPlayers / 2;
+                const isTeam2 = player.team === 2;
+                const teamOffset = isTeam2 ? (player.index - teamSize) : player.index;
+                
+                if (!isTeam2) player.x = 100 + (teamOffset * 60);
+                else player.x = canvas.width - 160 - (teamOffset * 60);
                 
                 player.y = GROUND_Y - player.h;
                 player.hp = player.maxHp;
