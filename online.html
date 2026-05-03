@@ -347,6 +347,7 @@
         <div id="resultOverlay">
             <h1 id="resultTitle">ROUND WON!</h1>
             <p id="resultSubtitle">Team 1: 1 - Team 2: 0</p>
+            <button id="rematchBtn" style="display:none; background:#0f0; border:none; padding:15px; cursor:pointer; font-family:inherit; margin-top:10px; color:#000; font-weight:bold;">VOTE REMATCH (0/?)</button>
             <button id="backToLobbyBtn" style="display:none; background:#0ff; border:none; padding:15px; cursor:pointer; font-family:inherit; margin-top:20px;">BACK TO MENU</button>
         </div>
 
@@ -440,6 +441,10 @@
             let team1Wins = 0;
             let team2Wins = 0;
             let roundEnded = false;
+            
+            // Rematch state
+            let rematchVotes = new Set();
+            let localVotedRematch = false;
 
             // ===== MULTIPLAYER CONFIG =====
             const urlParams = new URLSearchParams(window.location.search);
@@ -533,13 +538,16 @@
                         const team = idx < maxPlayers / 2 ? 1 : 2;
                         
                         conn.send({ type: 'init', index: idx, team: team, isSpectator: isSpectator });
+                        if (!remotePlayers[conn.peer]) remotePlayers[conn.peer] = {};
+                        Object.assign(remotePlayers[conn.peer], { team: team, isSpectator: isSpectator });
                         broadcastLobbyState();
                     }
                 });
 
                 conn.on('data', data => {
                     if (data.type === 'handshake') {
-                        remotePlayers[conn.peer] = { user: data.user, ready: false, isSpectator: false, team: 0 };
+                        if (!remotePlayers[conn.peer]) remotePlayers[conn.peer] = {};
+                        Object.assign(remotePlayers[conn.peer], { user: data.user, ready: false });
                         if (mode === 'host') broadcastLobbyState();
                         addChatMessage(`${data.user} joined the fray.`);
                     }
@@ -564,15 +572,35 @@
                     }
                     if (data.type === 'start') startCountdown();
                     if (data.type === 'roundResult') showRoundResult(data);
+                    if (data.type === 'rematchVote') {
+                        if (data.voted) rematchVotes.add(conn.peer); else rematchVotes.delete(conn.peer);
+                        checkRematchVotes();
+                    }
+                    if (data.type === 'rematchStatus') updateRematchButtonUI(data.count);
+                    if (data.type === 'rematchStart') {
+                        resetMatch();
+                        startCountdown();
+                    }
                     if (data.type === 'damage' && data.target === peer.id) {
                         player.hp -= data.amount;
                         triggerScreenShake(8, 4);
                     }
                     if (data.type === 'state') {
                         if (mode === 'join') {
-                            // Client receives everyone's state from host
                             for (let pid in data.players) {
-                                if (pid !== peer.id) remotePlayers[pid] = data.players[pid];
+                                if (pid !== peer.id) {
+                                    if (!remotePlayers[pid]) remotePlayers[pid] = {};
+                                    const s = data.players[pid];
+                                    remotePlayers[pid].targetX = s.x;
+                                    remotePlayers[pid].targetY = s.y;
+                                    remotePlayers[pid].hp = s.hp;
+                                    remotePlayers[pid].facing = s.facing;
+                                    remotePlayers[pid].team = s.team;
+                                    if (remotePlayers[pid].x === undefined) {
+                                        remotePlayers[pid].x = s.x;
+                                        remotePlayers[pid].y = s.y;
+                                    }
+                                }
                             }
                             matchTime = data.timer;
                             team1Wins = data.t1Wins;
@@ -580,8 +608,17 @@
                             currentRound = data.round;
                             document.getElementById('roundNum').innerText = currentRound;
                         } else {
-                            // Host receives individual client state
-                            remotePlayers[conn.peer] = data.player;
+                            if (!remotePlayers[conn.peer]) remotePlayers[conn.peer] = {};
+                            const s = data.player;
+                            remotePlayers[conn.peer].targetX = s.x;
+                            remotePlayers[conn.peer].targetY = s.y;
+                            remotePlayers[conn.peer].hp = s.hp;
+                            remotePlayers[conn.peer].facing = s.facing;
+                            remotePlayers[conn.peer].team = s.team;
+                            if (remotePlayers[conn.peer].x === undefined) {
+                                remotePlayers[conn.peer].x = s.x;
+                                remotePlayers[conn.peer].y = s.y;
+                            }
                         }
                     }
                 });
@@ -596,10 +633,50 @@
                 });
             }
 
+            function checkRematchVotes() {
+                if (mode !== 'host') return;
+                const totalPlayers = connections.length + 1;
+                broadcastRematchStatus();
+                if (rematchVotes.size >= totalPlayers) {
+                    connections.forEach(c => c.send({ type: 'rematchStart' }));
+                    resetMatch();
+                    startCountdown();
+                }
+            }
+
+            function broadcastRematchStatus() {
+                if (mode !== 'host') return;
+                connections.forEach(c => c.send({ type: 'rematchStatus', count: rematchVotes.size }));
+                updateRematchButtonUI(rematchVotes.size);
+            }
+
+            function updateRematchButtonUI(count) {
+                const total = connections.length + 1;
+                const btn = document.getElementById('rematchBtn');
+                btn.innerText = `VOTE REMATCH (${count}/${total})`;
+            }
+
+            function resetMatch() {
+                currentRound = 1;
+                team1Wins = 0;
+                team2Wins = 0;
+                matchTime = 90;
+                roundEnded = false;
+                rematchVotes.clear();
+                localVotedRematch = false;
+                document.getElementById('rematchBtn').style.filter = 'none';
+                document.getElementById('t1Score').innerText = '0';
+                document.getElementById('t2Score').innerText = '0';
+                document.getElementById('roundNum').innerText = '1';
+                document.getElementById('resultOverlay').style.display = 'none';
+                document.getElementById('backToLobbyBtn').style.display = 'none';
+                document.getElementById('rematchBtn').style.display = 'none';
+            }
+
             function broadcastLobbyState() {
-                const lobbyData = [{ id: peer.id, user: username, ready: player.ready, isSpectator: player.isSpectator }];
+                const lobbyData = [{ id: peer.id, user: username, ready: player.ready, isSpectator: player.isSpectator, team: player.team }];
                 for (let pid in remotePlayers) {
-                    lobbyData.push({ id: pid, user: remotePlayers[pid].user, ready: remotePlayers[pid].ready, isSpectator: remotePlayers[pid].isSpectator });
+                    lobbyData.push({ id: pid, user: remotePlayers[pid].user, ready: remotePlayers[pid].ready, isSpectator: remotePlayers[pid].isSpectator, team: remotePlayers[pid].team });
                 }
                 connections.forEach(c => c.send({ type: 'lobbySync', players: lobbyData }));
                 updateLobbyUI(lobbyData);
@@ -612,6 +689,7 @@
                         remotePlayers[p.id].user = p.user;
                         remotePlayers[p.id].ready = p.ready;
                         remotePlayers[p.id].isSpectator = p.isSpectator;
+                        remotePlayers[p.id].team = p.team;
                     }
                 });
                 updateLobbyUI(playerList);
@@ -655,6 +733,19 @@
                     broadcastLobbyState();
                 } else if (connections[0]) {
                     connections[0].send({ type: 'ready', value: player.ready });
+                }
+            };
+
+            document.getElementById('rematchBtn').onclick = () => {
+                localVotedRematch = !localVotedRematch;
+                const btn = document.getElementById('rematchBtn');
+                btn.style.filter = localVotedRematch ? 'brightness(1.5) drop-shadow(0 0 5px #0f0)' : 'none';
+                
+                if (mode === 'host') {
+                    if (localVotedRematch) rematchVotes.add(peer.id); else rematchVotes.delete(peer.id);
+                    checkRematchVotes();
+                } else if (connections[0]?.open) {
+                    connections[0].send({ type: 'rematchVote', voted: localVotedRematch });
                 }
             };
 
@@ -756,6 +847,8 @@
 
                 if (data.matchWinner) {
                     document.getElementById('backToLobbyBtn').style.display = 'block';
+                    document.getElementById('rematchBtn').style.display = 'block';
+                    updateRematchButtonUI(rematchVotes.size);
                 } else {
                     setTimeout(() => {
                         if (mode === 'host') {
@@ -1364,6 +1457,15 @@
                 if (menuOpen) return;
                 if (!isGameRunning) return;
 
+                // Smooth interpolation for remote players
+                for (let pid in remotePlayers) {
+                    let rp = remotePlayers[pid];
+                    if (rp.targetX !== undefined && rp.x !== undefined) {
+                        rp.x += (rp.targetX - rp.x) * 0.35;
+                        rp.y += (rp.targetY - rp.y) * 0.35;
+                    }
+                }
+
                 // --- NETWORK SYNC (60 FPS Goal) ---
                 if (mode === 'host') {
                     matchTime -= 1/60;
@@ -1680,11 +1782,11 @@
                 // REMOTE PLAYERS
                 for (let pid in remotePlayers) {
                     const rp = remotePlayers[pid];
-                    if (pid !== peer.id) {
-                        ctx.fillStyle = "#f33"; // Remote players are red
+                    if (pid !== peer.id && rp.x !== undefined && rp.y !== undefined) {
+                        ctx.fillStyle = rp.team === player.team ? "#4af" : "#f33"; 
                         ctx.fillRect(rp.x, rp.y, 40, 60);
                         // Name tag
-                        ctx.fillStyle = "#fff"; ctx.font = "8px Arial"; ctx.fillText(rp.user || "Player", rp.x + 20, rp.y - 5);
+                        ctx.fillStyle = "#fff"; ctx.font = "10px Arial"; ctx.fillText(rp.user || "Player", rp.x + 20, rp.y - 5);
                     }
                 }
                 // PLAYER
