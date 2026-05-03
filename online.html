@@ -3,6 +3,7 @@
     <head>
         <title>Fracture - Game</title>
         <style>
+            @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
             body {
                 margin: 0;
                 overflow: hidden;
@@ -226,26 +227,135 @@
                 z-index: 5; /* Below HUD, above canvas */
                 transition: background-color 0.1s ease-out; /* Smoother flash transition */
             }
+
+            /* Score UI */
+            #scoreUI {
+                position: fixed;
+                top: 55px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-family: 'Press Start 2P', cursive;
+                font-size: 12px;
+                color: #fff;
+                z-index: 10;
+            }
+
+            /* Multiplayer Overlays */
+            #overlayContainer {
+                position: fixed;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 100;
+                pointer-events: none;
+            }
+            #countdownText {
+                font-family: 'Press Start 2P', cursive;
+                font-size: 80px;
+                color: #0ff;
+                text-shadow: 0 0 20px #0ff;
+                display: none;
+            }
+            #lobbyBox {
+                width: 400px;
+                background: rgba(0, 0, 10, 0.9);
+                border: 2px solid #0ff;
+                padding: 20px;
+                pointer-events: auto;
+                color: #0ff;
+                font-family: 'Press Start 2P', cursive;
+                font-size: 10px;
+            }
+            #chatArea {
+                height: 150px;
+                overflow-y: auto;
+                border: 1px solid #0ff3;
+                margin: 10px 0;
+                padding: 5px;
+                font-family: monospace;
+                font-size: 12px;
+            }
+            #chatInput {
+                width: 100%;
+                background: #000;
+                border: 1px solid #0ff;
+                color: #fff;
+                padding: 5px;
+                box-sizing: border-box;
+            }
+            #gameTimerUI {
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-family: 'Press Start 2P', cursive;
+                font-size: 20px;
+                color: #fff;
+                z-index: 10;
+                text-shadow: 0 0 10px #000;
+            }
+
+            #spectatorUI {
+                position: fixed;
+                bottom: 20px;
+                left: 20px;
+                font-family: 'Press Start 2P', cursive;
+                font-size: 14px;
+                color: #ff0;
+                display: none;
+                z-index: 10;
+                text-shadow: 0 0 5px #000;
+            }
+
+            #resultOverlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.85);
+                display: none;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 200;
+                color: #0ff;
+                font-family: 'Press Start 2P';
+                text-align: center;
+                pointer-events: auto;
+            }
         </style>
     </head>
     <body>
         <canvas id="gameCanvas"></canvas>
         <div id="lowHpOverlay"></div>
         
+        <div id="scoreUI">
+            Round <span id="roundNum">1</span> | T1: <span id="t1Score">0</span> - T2: <span id="t2Score">0</span>
+        </div>
+
+        <div id="spectatorUI">SPECTATING MODE</div>
+
+        <div id="resultOverlay">
+            <h1 id="resultTitle">ROUND WON!</h1>
+            <p id="resultSubtitle">Team 1: 1 - Team 2: 0</p>
+            <button id="backToLobbyBtn" style="display:none; background:#0ff; border:none; padding:15px; cursor:pointer; font-family:inherit; margin-top:20px;">BACK TO MENU</button>
+        </div>
+
+        <div id="gameTimerUI">01:30</div>
+
+        <div id="overlayContainer">
+            <div id="countdownText">3</div>
+            <div id="lobbyBox">
+                <h2 style="margin-top:0">Lobby</h2>
+                <div id="playerList">Waiting for players... (1/?)</div>
+                <div id="chatArea"></div>
+                <input type="text" id="chatInput" placeholder="Press Enter to chat...">
+                <button id="startMatchBtn" style="margin-top:10px; width:100%; display:none; background:#0ff; border:none; padding:10px; cursor:pointer; font-family:inherit;">START MATCH</button>
+                <p id="waitMsg" style="font-size:8px; margin-top:10px;">Waiting for host to start...</p>
+            </div>
+        </div>
+        
         <div id="mainHud">
-            <div id="levelDisplay">Lvl: 1</div>
-            <div class="statBarContainer">
-                <div class="statBarInner" id="hpBarInner"></div>
-                <div class="statBarLabel" id="hpLabel">HP: 100 / 100</div>
-            </div>
-            <div class="statBarContainer">
-                <div class="statBarInner" id="energyBarInner"></div>
-                <div class="statBarLabel" id="energyLabel">Energy: 100 / 100</div>
-            </div>
-            <div class="statBarContainer">
-                <div class="statBarInner" id="xpBarInner"></div>
-                <div class="statBarLabel" id="xpLabel">XP: 0 / 100 (Level 1)</div>
-            </div>
+            <!-- HUD remains same, but level is shared or local -->
         </div>
 
         <div id="combatInfo">
@@ -307,12 +417,29 @@
             <p style="margin-top: 15px; color: #aaa;">Press 'C' to Close.</p>
         </div>
 
+        <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
         <script>
             // ===== CANVAS & CONTEXT SETUP =====
             const canvas = document.getElementById("gameCanvas");
             const ctx = canvas.getContext("2d");
             canvas.width = innerWidth;
             canvas.height = innerHeight;
+
+            // ===== ROUND STATE =====
+            let currentRound = 1;
+            let team1Wins = 0;
+            let team2Wins = 0;
+            let roundEnded = false;
+
+            // ===== MULTIPLAYER CONFIG =====
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode'); 
+            const roomId = urlParams.get('room');
+            const maxPlayers = parseInt(urlParams.get('size')) || 2;
+            const username = localStorage.getItem('fracture_username') || 'Guest';
+            
+            let isGameRunning = false;
+            let matchTime = 90; // 1:30
             
             // ===== PLAYER STATS =====
             const player = {
@@ -323,6 +450,9 @@
                 velX: 0,
                 velY: 0,
                 facing: 1,
+                index: 0,
+                team: 1,
+                isSpectator: false,
                 jumpCount: 0,
                 maxJumps: 2,
                 dashTime: 0,
@@ -355,6 +485,207 @@
                 isSprinting: false,
                 justStartedSprinting: false
             };
+
+            const remotePlayers = {}; 
+            let connections = [];
+            let peer;
+            let assignedPlayers = []; // IDs of players (host side only)
+
+            // PeerJS Setup
+            if (mode === 'host') {
+                peer = new Peer(roomId);
+                document.getElementById('startMatchBtn').style.display = 'block';
+                document.getElementById('waitMsg').style.display = 'none';
+                
+                peer.on('connection', conn => {
+                    setupConnection(conn);
+                });
+            } else {
+                peer = new Peer();
+                peer.on('open', () => {
+                    const conn = peer.connect(roomId);
+                    setupConnection(conn);
+                });
+            }
+
+            function setupConnection(conn) {
+                conn.on('open', () => {
+                    connections.push(conn);
+                    updateLobbyUI();
+                    conn.send({ type: 'handshake', user: username });
+
+                    if (mode === 'host') {
+                        if (assignedPlayers.length < maxPlayers - 1) {
+                            assignedPlayers.push(conn.peer);
+                            const idx = assignedPlayers.length;
+                            const team = idx < maxPlayers / 2 ? 1 : 2;
+                            conn.send({ type: 'init', index: idx, team: team, isSpectator: false });
+                        } else {
+                            conn.send({ type: 'init', isSpectator: true });
+                        }
+                    }
+                });
+
+                conn.on('data', data => {
+                    if (data.type === 'handshake') {
+                        remotePlayers[conn.peer] = { user: data.user, x: 0, y: 0, hp: 100, facing: 1, team: 0 };
+                        updateLobbyUI();
+                        addChatMessage(`${data.user} joined the fray.`);
+                    }
+                    if (data.type === 'init') {
+                        player.index = data.index;
+                        player.team = data.team;
+                        player.isSpectator = data.isSpectator;
+                        if (player.isSpectator) {
+                            document.getElementById('spectatorUI').style.display = 'block';
+                            document.getElementById('mainHud').style.display = 'none';
+                        }
+                    }
+                    if (data.type === 'chat') addChatMessage(`${data.user}: ${data.text}`);
+                    if (data.type === 'start') startCountdown();
+                    if (data.type === 'roundResult') showRoundResult(data);
+                    if (data.type === 'damage' && data.target === peer.id) {
+                        player.hp -= data.amount;
+                        triggerScreenShake(8, 4);
+                    }
+                    if (data.type === 'state') {
+                        if (mode === 'join') {
+                            // Client receives everyone's state from host
+                            for (let pid in data.players) {
+                                if (pid !== peer.id) remotePlayers[pid] = data.players[pid];
+                            }
+                            matchTime = data.timer;
+                            team1Wins = data.t1Wins;
+                            team2Wins = data.t2Wins;
+                            currentRound = data.round;
+                            document.getElementById('roundNum').innerText = currentRound;
+                        } else {
+                            // Host receives individual client state
+                            remotePlayers[conn.peer] = data.player;
+                        }
+                    }
+                });
+            }
+
+            function updateLobbyUI() {
+                const total = connections.length + 1;
+                const spectators = total > maxPlayers ? total - maxPlayers : 0;
+                const playersCount = total - spectators;
+                document.getElementById('playerList').innerText = `Players: ${playersCount}/${maxPlayers} | Spectators: ${spectators}`;
+            }
+
+            function addChatMessage(msg) {
+                const area = document.getElementById('chatArea');
+                area.innerHTML += `<div>${msg}</div>`;
+                area.scrollTop = area.scrollHeight;
+            }
+
+            document.getElementById('chatInput').addEventListener('keydown', e => {
+                if (e.key === 'Enter' && e.target.value.trim()) {
+                    const text = e.target.value.trim();
+                    connections.forEach(c => c.send({ type: 'chat', user: username, text }));
+                    addChatMessage(`${username}: ${text}`);
+                    e.target.value = '';
+                }
+            });
+
+            document.getElementById('startMatchBtn').addEventListener('click', () => {
+                currentRound = 1;
+                team1Wins = 0;
+                team2Wins = 0;
+                connections.forEach(c => c.send({ type: 'start' }));
+                startCountdown();
+            });
+
+            function startCountdown() {
+                roundEnded = false;
+                document.getElementById('lobbyBox').style.display = 'none';
+                document.getElementById('resultOverlay').style.display = 'none';
+                const cd = document.getElementById('countdownText');
+                cd.style.display = 'block';
+                let count = 3;
+                const itv = setInterval(() => {
+                    count--;
+                    cd.innerText = count;
+                    if (count <= 0) {
+                        clearInterval(itv);
+                        cd.style.display = 'none';
+                        isGameRunning = true;
+                        spawnPlayers();
+                    }
+                }, 1000);
+            }
+
+            function checkElimination() {
+                let t1Alive = player.team === 1 ? player.hp > 0 : false;
+                let t2Alive = player.team === 2 ? player.hp > 0 : false;
+                let t2Exists = player.team === 2;
+                
+                for (let id in remotePlayers) {
+                    let p = remotePlayers[id];
+                    if (p.team === 1 && p.hp > 0) t1Alive = true;
+                    if (p.team === 2 && p.hp > 0) t2Alive = true;
+                    if (p.team === 2) t2Exists = true;
+                }
+                
+                if (!t2Exists) return; // Wait for full teams
+
+                if (!t1Alive) endRound("TEAM 2 WINS ROUND!");
+                else if (!t2Alive) endRound("TEAM 1 WINS ROUND!");
+            }
+
+            function endRound(reason) {
+                if (roundEnded || mode !== 'host') return;
+                roundEnded = true;
+                
+                let winner = 0;
+                if (reason === "Time Up!") {
+                    let t1Hp = player.team === 1 ? player.hp : 0;
+                    let t2Hp = player.team === 2 ? player.hp : 0;
+                    for (let id in remotePlayers) {
+                        if (remotePlayers[id].team === 1) t1Hp += remotePlayers[id].hp;
+                        else t2Hp += remotePlayers[id].hp;
+                    }
+                    winner = t1Hp >= t2Hp ? 1 : 2;
+                } else {
+                    winner = reason.includes("TEAM 1") ? 1 : 2;
+                }
+
+                if (winner === 1) team1Wins++; else team2Wins++;
+                
+                const matchWinner = team1Wins >= 2 ? 1 : (team2Wins >= 2 ? 2 : 0);
+                const data = { type: 'roundResult', reason, winner, t1Wins: team1Wins, t2Wins: team2Wins, matchWinner };
+                
+                connections.forEach(c => c.send(data));
+                showRoundResult(data);
+            }
+
+            function showRoundResult(data) {
+                isGameRunning = false;
+                const overlay = document.getElementById('resultOverlay');
+                overlay.style.display = 'flex';
+                document.getElementById('resultTitle').innerText = data.matchWinner ? `TEAM ${data.matchWinner} WINS MATCH!` : data.reason;
+                document.getElementById('resultSubtitle').innerText = `Score: ${data.t1Wins} - ${data.t2Wins}`;
+                
+                document.getElementById('t1Score').innerText = data.t1Wins;
+                document.getElementById('t2Score').innerText = data.t2Wins;
+
+                if (data.matchWinner) {
+                    document.getElementById('backToLobbyBtn').style.display = 'block';
+                } else {
+                    setTimeout(() => {
+                        if (mode === 'host') {
+                            currentRound++;
+                            connections.forEach(c => c.send({ type: 'start' }));
+                            startCountdown();
+                        }
+                    }, 3000);
+                }
+            }
+
+            document.getElementById('backToLobbyBtn').onclick = () => location.href = 'index.html';
+
+            const GROUND_Y = canvas.height - 80;
 
             // ===== COMBAT METRICS =====
             const combatMetrics = {
@@ -398,28 +729,23 @@
             document.getElementById("name4").innerText = "Dash/Punch";
             document.getElementById("abilityTitle").innerHTML = `${savedBuild} Build Active / **DASH (Q)** / **BLOCK (F)**`;
 
-            // ===== NPC ===== 
-            const npc = {
-                x: 400,
-                y: 0,
-                w: 40,
-                h: 60,
-                hp: 300,
-                maxHp: 300,
-                alive: true,
-                xpValue: 50,
-                isAirborne: false,
-                airborneVelY: 0,
-                airborneLife: 0,
-                // NEW: Physics & Visuals
-                velX: 0,
-                hitFlashTimer: 0
-            };
-            const GROUND_Y = canvas.height - 80;
+            function spawnPlayers() {
+                if (player.isSpectator) return;
+                const isTeam2 = player.team === 2;
+                const offset = isTeam2 ? (player.index - maxPlayers/2) : player.index;
+                
+                if (!isTeam2) player.x = 100 + (offset * 60);
+                else player.x = canvas.width - 160 - (offset * 60);
+                
+                player.y = GROUND_Y - player.h;
+                player.hp = player.maxHp;
+                player.velX = 0;
+                player.velY = 0;
+                document.getElementById('roundNum').innerText = currentRound;
+            }
 
             // ===== INPUT =====
             const keys = {};
-            document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
             document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
             let mouseDown = false;
             canvas.addEventListener("mousedown", () => mouseDown = true);
@@ -427,6 +753,7 @@
 
             let menuOpen = false;
             document.addEventListener("keydown", (e) => {
+                keys[e.key.toLowerCase()] = true;
                 if (e.key.toLowerCase() === "c") {
                     menuOpen = !menuOpen;
                     document.getElementById('statsMenu').style.display = menuOpen ? 'block' : 'none';
@@ -586,16 +913,6 @@
                 return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + a.h && a.y + a.h > b.y;
             }
 
-            function getNPCBox() {
-                const ground = GROUND_Y;
-                return {
-                    x: npc.x,
-                    y: npc.isAirborne ? npc.y : ground - npc.h, // Fixed hitbox for airborne
-                    w: npc.w,
-                    h: npc.h
-                };
-            }
-
             function getAttackBox(customWidth) {
                 const width = customWidth || (20 + player.stats.strength * 1.5);
                 return {
@@ -711,23 +1028,9 @@
                 }
             }
             
-            setInterval(() => {
-                if (npc.alive && !menuOpen) {
-                    if (Math.abs(player.x - npc.x) < 100) {
-                        dealDamageToPlayer(15);
-                    }
-                }
-                if (!npc.alive) {
-                    npc.hp = npc.maxHp;
-                    npc.alive = true;
-                    document.getElementById("npcHpBar").style.display = "none";
-                    npc.x = 400; // Reset position
-                }
-            }, 2000);
-
-
-            // ===================== ABILITIES (UPDATED PUNCH) =====================
             function universalPunch() {
+                if (!isGameRunning) return;
+
                 if (player.attackCooldown <= 0) {
                     player.attackTime = 10;
                     player.attackCooldown = 20;
@@ -749,36 +1052,17 @@
                         }
                     }
 
-                    // Passing knockback here
-                    dealDamageToNPC(damage, false, knockback);
+                    dealDamageToPlayers(damage);
                     
-                    let npcBox = getNPCBox();
-                    let hitbox = getAttackBox();
-
-                    if (rectCollide(hitbox, npcBox) && npc.alive) {
+                    // Collision Visuals
+                    if (true) { // Visual checks locally
                         if (moveType === 'Uppercut') {
-                            vfxQueue.push({ type: 'shockwave', x: npc.x + npc.w / 2, y: npc.y + npc.h / 2, color: "#ffffff", life: 15, radius: 10, maxRadius: 150 });
-                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#fff", 80, 15); // MORE PARTICLES
-                            triggerScreenShake(15, 8); // HEAVY SHAKE
-
-                            npc.isAirborne = true;
-                            npc.airborneVelY = -25;
-                            npc.airborneLife = 30;
-                            npc.velX = 0; // Stop horizontal movement for uppercut
-                            
+                            triggerScreenShake(15, 8); 
                             player.velY = -15; 
                             player.jumpCount = player.maxJumps; 
                         } else if (moveType === 'Downslam') {
-                            vfxQueue.push({ type: 'shockwave', x: npc.x + npc.w / 2, y: GROUND_Y, color: "#ff0000", life: 30, radius: 20, maxRadius: 800 });
-                            burstParticles(npc.x + npc.w / 2, npc.y + npc.h / 2, "#ff0000", 120, 20); // MORE PARTICLES
-                            triggerScreenShake(30, 20); // HEAVY SHAKE
-
-                            npc.isAirborne = false; 
-                            npc.airborneLife = 0;
-                            npc.y = GROUND_Y - npc.h;
-                            npc.velX = 0; // Stop horizontal sliding
-                            
-                            vfxQueue.push({ type: 'impactFlash', x: npc.x + npc.w / 2, y: GROUND_Y, color: "#ffaa00", life: 10 });
+                            triggerScreenShake(30, 20); 
+                            vfxQueue.push({ type: 'impactFlash', x: player.x + player.facing * 40, y: GROUND_Y, color: "#ffaa00", life: 10 });
 
                             player.velY = 0;
                             player.y = GROUND_Y - player.h;
@@ -992,38 +1276,40 @@
             // ===== UPDATE LOOP =====
             function update() {
                 if (menuOpen) return;
+                if (!isGameRunning) return;
 
-                // --- UPDATE NPC PHYSICS (KNOCKBACK) ---
-                if (npc.alive) {
-                    // Apply velocity
-                    npc.x += npc.velX;
-                    // Apply friction
-                    npc.velX *= 0.9;
-                    if (Math.abs(npc.velX) < 0.5) npc.velX = 0;
+                // --- NETWORK SYNC (60 FPS Goal) ---
+                if (mode === 'host') {
+                    matchTime -= 1/60;
+                    if (matchTime < 0) matchTime = 0;
                     
-                    // Hit Flash Timer
-                    if (npc.hitFlashTimer > 0) npc.hitFlashTimer--;
-
-                    // Keep inside arena (roughly)
-                    if (npc.x < -200) npc.x = -200;
-                    if (npc.x > canvas.width + 200) npc.x = canvas.width + 200;
-                }
-
-                if (npc.isAirborne) {
-                    const currentGroundY = canvas.height - 80;
-                    npc.airborneVelY += 1.2; 
-                    npc.y += npc.airborneVelY;
-                    npc.airborneLife--;
-                    
-                    if (npc.airborneLife <= 0 || npc.y + npc.h >= currentGroundY) {
-                         npc.isAirborne = false;
-                         npc.y = currentGroundY - npc.h;
-                         vfxQueue.push({ type: 'impactFlash', x: npc.x + npc.w / 2, y: currentGroundY, color: "#ffaa00", life: 10 });
+                    if (isGameRunning && !roundEnded) {
+                        if (matchTime <= 0) endRound("Time Up!");
+                        else checkElimination();
                     }
+
+                    connections.forEach(c => {
+                        let playerStates = { [peer.id]: player };
+                        for (let pid in remotePlayers) {
+                            if (remotePlayers[pid].team > 0) playerStates[pid] = remotePlayers[pid];
+                        }
+                        c.send({ type: 'state', players: playerStates, timer: matchTime, t1Wins, t2Wins, round: currentRound });
+                    });
+                } else if (connections[0]?.open && !player.isSpectator) {
+                    connections[0].send({ type: 'state', player: { x: player.x, y: player.y, hp: player.hp, facing: player.facing, team: player.team, state: player.isDashing ? 'dash' : 'idle' } });
                 }
 
-                // --- PLAYER MOVEMENT & PHYSICS ---
-                
+                // Timer UI
+                const mins = Math.floor(matchTime / 60);
+                const secs = Math.floor(matchTime % 60);
+                document.getElementById('gameTimerUI').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+
+                if (player.isSpectator) {
+                    // Spectators gradually move camera back to center
+                    camX += ((0) - camX) * 0.08;
+                    return;
+                }
+
                 // Track previous ground state for landing dust
                 player.wasOnGround = player.onGround;
                 const oldVelY = player.velY; // Store vertical velocity before gravity is applied
@@ -1121,24 +1407,7 @@
                 
                 // --- DASHING & COMBAT ---
 
-                if (player.isDashing && npc.alive && !player.hasDashHit) {
-                    let dashHitbox = { x: player.x, y: player.y, w: player.w, h: player.h };
-                    let npcBox = getNPCBox();
-
-                    if (rectCollide(dashHitbox, npcBox)) {
-                        const dashPunchDamage = player.stats.strength * 2.5;
-                        dealDamageToNPC(dashPunchDamage, true, 12); // Heavy Knockback on Dash
-
-                        player.velX = 0;
-                        player.isDashing = false; 
-                        player.dashTime = 0; 
-                        player.hasDashHit = true;
-
-                        player.attackTime = 10;
-                        triggerScreenShake(15, 8); // HEAVY SHAKE
-                    }
-                }
-                
+                // Dash collision with remote players would go here
                 if (player.dashTime > 0) player.dashTime--;
                 
                 if (player.isDashing && player.dashTime <= 0) {
@@ -1205,11 +1474,6 @@
                 const xpRatio = player.xp / player.xpToNextLevel;
                 document.getElementById("xpBarInner").style.width = (xpRatio * 100) + "%";
                 document.getElementById("xpLabel").innerText = `XP: ${parseInt(player.xp)} / ${player.xpToNextLevel}`;
-                document.getElementById("levelDisplay").innerText = `Lvl: ${player.level}`;
-                
-                if (npc.alive) {
-                    document.getElementById("npcHpBarInner").style.width = (npc.hp / npc.maxHp * 100) + "%";
-                }
 
                 // NEW: Low HP Red Tint (Flashing)
                 let redTintOpacity = 0;
@@ -1329,49 +1593,32 @@
                 }
                 ctx.globalAlpha = 1;
 
-                // NPC
-                if (npc.alive) {
-                    const npcDrawY = npc.isAirborne ? npc.y : GROUND_Y_GLOBAL - npc.h;
-                    
-                    // --- VFX: HIT FLASH DRAWING ---
-                    if (npc.hitFlashTimer > 0) {
-                        ctx.fillStyle = "#ffffff"; // Pure white flash
-                        ctx.shadowBlur = 20;
-                        ctx.shadowColor = "white";
-                    } else {
-                        ctx.fillStyle = "#f33"; // Normal Color
-                        ctx.shadowBlur = 0;
-                    }
-
-                    ctx.fillRect(npc.x, npcDrawY, npc.w, npc.h);
-                    ctx.shadowBlur = 0; // Reset shadow
-                    
-                    if(npc.isAirborne) {
-                        ctx.strokeStyle = "#ffffff";
-                        ctx.lineWidth = 1;
-                        ctx.globalAlpha = 0.5;
-                        ctx.beginPath();
-                        ctx.moveTo(npc.x + npc.w/2, npcDrawY);
-                        ctx.lineTo(npc.x + npc.w/2, GROUND_Y_GLOBAL - npc.h);
-                        ctx.stroke();
-                        ctx.globalAlpha = 1;
+                // REMOTE PLAYERS
+                for (let pid in remotePlayers) {
+                    const rp = remotePlayers[pid];
+                    if (pid !== peer.id) {
+                        ctx.fillStyle = "#f33"; // Remote players are red
+                        ctx.fillRect(rp.x, rp.y, 40, 60);
+                        // Name tag
+                        ctx.fillStyle = "#fff"; ctx.font = "8px Arial"; ctx.fillText(rp.user || "Player", rp.x + 20, rp.y - 5);
                     }
                 }
-
                 // PLAYER
-                ctx.fillStyle = "#4af";
-                if (player.invincible) {
-                    ctx.fillStyle = "#00ffff";
-                    ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.3;
-                } else if (player.berserkMode) {
-                    ctx.fillStyle = "#ff5555";
-                } else if (player.isBlocking) {
-                    ctx.fillStyle = "#aaa";
-                } else if (player.isDashing) {
-                    ctx.fillStyle = "#4aff00";
+                if (!player.isSpectator) {
+                    ctx.fillStyle = "#4af";
+                    if (player.invincible) {
+                        ctx.fillStyle = "#00ffff";
+                        ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 50) * 0.3;
+                    } else if (player.berserkMode) {
+                        ctx.fillStyle = "#ff5555";
+                    } else if (player.isBlocking) {
+                        ctx.fillStyle = "#aaa";
+                    } else if (player.isDashing) {
+                        ctx.fillStyle = "#4aff00";
+                    }
+                    ctx.fillRect(player.x, player.y, player.w, player.h);
+                    ctx.globalAlpha = 1;
                 }
-                ctx.fillRect(player.x, player.y, player.w, player.h);
-                ctx.globalAlpha = 1;
 
                 if (player.isBlocking) {
                     ctx.strokeStyle = "#ffffff";
