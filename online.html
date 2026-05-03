@@ -307,6 +307,16 @@
                 z-index: 10;
                 text-shadow: 0 0 5px #000;
             }
+            
+            .player-entry {
+                display: flex;
+                justify-content: space-between;
+                margin: 5px 0;
+                padding: 3px;
+                border-bottom: 1px solid #0ff2;
+            }
+            .ready-tag { color: #0f0; }
+            .not-ready-tag { color: #f33; }
 
             #resultOverlay {
                 position: fixed;
@@ -346,9 +356,10 @@
             <div id="countdownText">3</div>
             <div id="lobbyBox">
                 <h2 style="margin-top:0">Lobby</h2>
-                <div id="playerList">Waiting for players... (1/?)</div>
+                <div id="playerListContainer" style="max-height: 100px; overflow-y: auto; margin-bottom: 10px;"></div>
                 <div id="chatArea"></div>
                 <input type="text" id="chatInput" placeholder="Press Enter to chat...">
+                <button id="readyBtn" style="margin-top:10px; width:100%; background:#444; color:#fff; border:none; padding:10px; cursor:pointer; font-family:inherit;">READY</button>
                 <button id="startMatchBtn" style="margin-top:10px; width:100%; display:none; background:#0ff; border:none; padding:10px; cursor:pointer; font-family:inherit;">START MATCH</button>
                 <p id="waitMsg" style="font-size:8px; margin-top:10px;">Waiting for host to start...</p>
             </div>
@@ -450,6 +461,7 @@
                 index: 0,
                 team: 1,
                 isSpectator: false,
+                ready: false,
                 jumpCount: 0,
                 maxJumps: 2,
                 dashTime: 0,
@@ -488,9 +500,13 @@
             let peer;
             let assignedPlayers = []; // IDs of players (host side only)
 
+            const peerConfig = {
+                config: { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }, { 'urls': 'stun:stun1.l.google.com:19302' }, { 'urls': 'stun:stun2.l.google.com:19302' }] }
+            };
+
             // PeerJS Setup
             if (mode === 'host') {
-                peer = new Peer(roomId);
+                peer = new Peer(roomId, peerConfig);
                 document.getElementById('startMatchBtn').style.display = 'block';
                 document.getElementById('waitMsg').style.display = 'none';
                 
@@ -498,7 +514,7 @@
                     setupConnection(conn);
                 });
             } else {
-                peer = new Peer();
+                peer = new Peer(undefined, peerConfig);
                 peer.on('open', () => {
                     const conn = peer.connect(roomId);
                     setupConnection(conn);
@@ -508,7 +524,6 @@
             function setupConnection(conn) {
                 conn.on('open', () => {
                     connections.push(conn);
-                    updateLobbyUI();
                     conn.send({ type: 'handshake', user: username });
 
                     if (mode === 'host') {
@@ -518,14 +533,14 @@
                         const team = idx < maxPlayers / 2 ? 1 : 2;
                         
                         conn.send({ type: 'init', index: idx, team: team, isSpectator: isSpectator });
-                        updateLobbyUI();
+                        broadcastLobbyState();
                     }
                 });
 
                 conn.on('data', data => {
                     if (data.type === 'handshake') {
-                        remotePlayers[conn.peer] = { user: data.user, x: 0, y: 0, hp: 100, facing: 1, team: 0 };
-                        updateLobbyUI();
+                        remotePlayers[conn.peer] = { user: data.user, ready: false, isSpectator: false, team: 0 };
+                        if (mode === 'host') broadcastLobbyState();
                         addChatMessage(`${data.user} joined the fray.`);
                     }
                     if (data.type === 'init') {
@@ -538,6 +553,15 @@
                         }
                     }
                     if (data.type === 'chat') addChatMessage(`${data.user}: ${data.text}`);
+                    if (data.type === 'ready') {
+                        if (remotePlayers[conn.peer]) {
+                            remotePlayers[conn.peer].ready = data.value;
+                            if (mode === 'host') broadcastLobbyState();
+                        }
+                    }
+                    if (data.type === 'lobbySync') {
+                        syncLobbyData(data.players);
+                    }
                     if (data.type === 'start') startCountdown();
                     if (data.type === 'roundResult') showRoundResult(data);
                     if (data.type === 'damage' && data.target === peer.id) {
@@ -561,14 +585,78 @@
                         }
                     }
                 });
+
+                conn.on('close', () => {
+                    connections = connections.filter(c => c !== conn);
+                    delete remotePlayers[conn.peer];
+                    if (mode === 'host') {
+                        assignedPlayers = assignedPlayers.filter(id => id !== conn.peer);
+                        broadcastLobbyState();
+                    }
+                });
             }
 
-            function updateLobbyUI() {
-                const totalInRoom = connections.length + 1;
-                const playerCount = Math.min(totalInRoom, maxPlayers);
-                const spectatorCount = Math.max(0, totalInRoom - maxPlayers);
-                document.getElementById('playerList').innerText = `Players: ${playerCount}/${maxPlayers} | Spectators: ${spectatorCount}`;
+            function broadcastLobbyState() {
+                const lobbyData = [{ id: peer.id, user: username, ready: player.ready, isSpectator: player.isSpectator }];
+                for (let pid in remotePlayers) {
+                    lobbyData.push({ id: pid, user: remotePlayers[pid].user, ready: remotePlayers[pid].ready, isSpectator: remotePlayers[pid].isSpectator });
+                }
+                connections.forEach(c => c.send({ type: 'lobbySync', players: lobbyData }));
+                updateLobbyUI(lobbyData);
             }
+
+            function syncLobbyData(playerList) {
+                playerList.forEach(p => {
+                    if (p.id !== peer.id) {
+                        if (!remotePlayers[p.id]) remotePlayers[p.id] = {};
+                        remotePlayers[p.id].user = p.user;
+                        remotePlayers[p.id].ready = p.ready;
+                        remotePlayers[p.id].isSpectator = p.isSpectator;
+                    }
+                });
+                updateLobbyUI(playerList);
+            }
+
+            function updateLobbyUI(players) {
+                const container = document.getElementById('playerListContainer');
+                container.innerHTML = '';
+                
+                let allReady = true;
+                let activePlayerCount = 0;
+
+                players.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'player-entry';
+                    const status = p.isSpectator ? '(Spec)' : (p.ready ? '<span class="ready-tag">READY</span>' : '<span class="not-ready-tag">WAIT</span>');
+                    div.innerHTML = `<span>${p.user}</span> <span>${status}</span>`;
+                    container.appendChild(div);
+
+                    if (!p.isSpectator) {
+                        activePlayerCount++;
+                        if (!p.ready) allReady = false;
+                    }
+                });
+
+                const startBtn = document.getElementById('startMatchBtn');
+                if (mode === 'host') {
+                    startBtn.disabled = !allReady || activePlayerCount < maxPlayers;
+                    startBtn.style.opacity = startBtn.disabled ? 0.5 : 1;
+                }
+            }
+
+            document.getElementById('readyBtn').onclick = () => {
+                player.ready = !player.ready;
+                const btn = document.getElementById('readyBtn');
+                btn.innerText = player.ready ? 'UNREADY' : 'READY';
+                btn.style.background = player.ready ? '#0f0' : '#444';
+                btn.style.color = player.ready ? '#000' : '#fff';
+
+                if (mode === 'host') {
+                    broadcastLobbyState();
+                } else if (connections[0]) {
+                    connections[0].send({ type: 'ready', value: player.ready });
+                }
+            };
 
             function addChatMessage(msg) {
                 const area = document.getElementById('chatArea');
@@ -1302,11 +1390,9 @@
                 const secs = Math.floor(matchTime % 60);
                 document.getElementById('gameTimerUI').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
 
-                if (player.isSpectator) {
-                    // Spectators gradually move camera back to center
-                    camX += ((0) - camX) * 0.08;
-                    return;
-                }
+                // Camera Follow Logic (Centered on player with smooth lerp)
+                const targetCamX = player.isSpectator ? 0 : (player.x - canvas.width / 2 + player.w / 2);
+                camX += (targetCamX - camX) * 0.1;
 
                 // Track previous ground state for landing dust
                 player.wasOnGround = player.onGround;
@@ -1581,7 +1667,7 @@
 
                 // GROUND (Moves 1:1 with camera)
                 ctx.fillStyle = "#222";
-                ctx.fillRect(camX - 1000, GROUND_Y_GLOBAL, canvas.width + 2000, 80); // Draw a very long ground bar
+                ctx.fillRect(camX - canvas.width, GROUND_Y_GLOBAL, canvas.width * 3, 80); 
                 
                 // AFTERIMAGES
                 for (let img of afterimages) {
@@ -1712,12 +1798,26 @@
                 }
             }
 
-            function loop() {
-                update();
+            let lastTime = performance.now();
+            const tickRate = 1000 / 60;
+            let accumulator = 0;
+
+            function loop(time) {
+                let dt = time - lastTime;
+                lastTime = time;
+                
+                if (dt > 100) dt = 100; // Cap to avoid spiral of death
+                
+                accumulator += dt;
+                while (accumulator >= tickRate) {
+                    update();
+                    accumulator -= tickRate;
+                }
+
                 draw();
                 requestAnimationFrame(loop);
             }
-            loop();
+            requestAnimationFrame(loop);
         </script>
     </body>
 </html>
